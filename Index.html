@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student System - نظام الطلاب</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* خطوط متغيرة حسب اللغة */
+        :root {
+            --font-ar: 'Cairo', sans-serif;
+            --font-en: 'Roboto', sans-serif;
+        }
+        body[dir="rtl"] { font-family: var(--font-ar); }
+        body[dir="ltr"] { font-family: var(--font-en); }
+        
+        body { background-color: #f8fafc; transition: all 0.3s ease; }
+        
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* فئات مساعدة للاتجاهات */
+        .text-start { text-align: start; }
+        .input-primary { 
+            @apply w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-start; 
+        }
+        .btn-primary { 
+            @apply bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-bold flex items-center justify-center gap-2; 
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- قاموس الترجمات ---
+        const translations = {
+            ar: {
+                appTitle: "نظام سجلات الطلاب",
+                registerBtn: "تسجيل",
+                searchBtn: "بحث وعرض",
+                adminBtn: "الإدارة",
+                langBtn: "English",
+                // Register View
+                regTitle: "تسجيل طالب جديد",
+                name: "الاسم الرباعي",
+                nationalId: "رقم الهوية",
+                phone: "رقم الهاتف",
+                uploadPhoto: "صورة شخصية",
+                uploadDoc: "صورة الهوية/مستند",
+                saveData: "حفظ البيانات",
+                savedSuccess: "تم الحفظ بنجاح",
+                req: "مطلوب",
+                // Search View
+                searchPlaceholder: "ابحث بالاسم، الهوية...",
+                noResults: "لا توجد نتائج مطابقة",
+                viewAttachment: "عرض المرفق",
+                attachTitle: "عرض المستند",
+                // Admin View
+                adminPanel: "لوحة التحكم",
+                testData: "توليد بيانات تجريبية",
+                logout: "خروج",
+                addFields: "إضافة حقول مخصصة",
+                fieldPlaceholder: "اسم الحقل (مثلاً: العنوان)",
+                actions: "إجراءات",
+                editSuccess: "تم التعديل بنجاح",
+                deleteConfirm: "هل أنت متأكد من الحذف؟",
+                listEmpty: "القائمة فارغة",
+                loginTitle: "دخول المدير",
+                loginBtn: "تسجيل الدخول",
+                passWrong: "كلمة المرور غير صحيحة",
+                passPlaceholder: "كلمة المرور (1234)",
+                dataGenerated: "تم توليد بيانات اختبار",
+                newField: "حقل جديد"
+            },
+            en: {
+                appTitle: "Student Records System",
+                registerBtn: "Register",
+                searchBtn: "Search",
+                adminBtn: "Admin",
+                langBtn: "عربي",
+                // Register View
+                regTitle: "Register New Student",
+                name: "Full Name",
+                nationalId: "National ID",
+                phone: "Phone Number",
+                uploadPhoto: "Profile Photo",
+                uploadDoc: "ID/Document Photo",
+                saveData: "Save Data",
+                savedSuccess: "Saved Successfully",
+                req: "Required",
+                // Search View
+                searchPlaceholder: "Search by Name, ID...",
+                noResults: "No results found",
+                viewAttachment: "View Attachment",
+                attachTitle: "View Document",
+                // Admin View
+                adminPanel: "Admin Dashboard",
+                testData: "Generate Test Data",
+                logout: "Logout",
+                addFields: "Add Custom Fields",
+                fieldPlaceholder: "Field Name (e.g. Address)",
+                actions: "Actions",
+                editSuccess: "Edited Successfully",
+                deleteConfirm: "Are you sure you want to delete?",
+                listEmpty: "List is empty",
+                loginTitle: "Admin Login",
+                loginBtn: "Login",
+                passWrong: "Incorrect Password",
+                passPlaceholder: "Password (1234)",
+                dataGenerated: "Test data generated",
+                newField: "New Field"
+            }
+        };
+
+        // --- الأيقونات ---
+        const Icons = {
+            User: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>,
+            Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>,
+            Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>,
+            Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
+            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>,
+            Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>,
+            Image: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>,
+            Lock: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>,
+            Database: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s 9-1.34 9-3V5"></path></svg>,
+            Globe: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>,
+            FileText: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        };
+
+        const App = () => {
+            // --- الحالة (State) ---
+            const [lang, setLang] = useState(localStorage.getItem('app_lang') || 'ar');
+            const [view, setView] = useState('home'); 
+            const [students, setStudents] = useState([]);
+            const [fields, setFields] = useState([
+                { id: 'name', label: 'name', type: 'text', required: true },
+                { id: 'nationalId', label: 'nationalId', type: 'number', required: true },
+                { id: 'phone', label: 'phone', type: 'tel', required: false }
+            ]);
+            const [notification, setNotification] = useState(null);
+            const [isAdmin, setIsAdmin] = useState(false);
+
+            const t = translations[lang]; // النص الحالي
+
+            // --- تغيير اللغة وتحديث الاتجاه ---
+            useEffect(() => {
+                document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+                document.documentElement.lang = lang;
+                localStorage.setItem('app_lang', lang);
+            }, [lang]);
+
+            const toggleLang = () => setLang(prev => prev === 'ar' ? 'en' : 'ar');
+
+            // دالة لجلب النص المترجم للحقل (يدعم الحقول الافتراضية والمخصصة)
+            const getFieldLabel = (fieldId, fieldLabel) => {
+                return translations[lang][fieldId] || fieldLabel;
+            };
+
+            // --- استرجاع وحفظ البيانات ---
+            useEffect(() => {
+                try {
+                    const data = localStorage.getItem('std_data_bi');
+                    const flds = localStorage.getItem('std_fields_bi');
+                    if (data) setStudents(JSON.parse(data));
+                    if (flds) setFields(JSON.parse(flds));
+                } catch(e) { console.error(e); }
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('std_data_bi', JSON.stringify(students));
+                localStorage.setItem('std_fields_bi', JSON.stringify(fields));
+            }, [students, fields]);
+
+            const showNotify = (msg, type = 'success') => {
+                setNotification({ msg, type });
+                setTimeout(() => setNotification(null), 3000);
+            };
+
+            // --- المكونات الفرعية ---
+
+            const Navbar = () => (
+                <nav className="bg-white border-b sticky top-0 z-50 shadow-sm">
+                    <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-blue-700 font-bold text-xl">
+                            <Icons.User /> <span className="hidden md:inline">{t.appTitle}</span>
+                        </div>
+                        <div className="flex items-center gap-2 md:gap-4 text-sm md:text-base">
+                            <button onClick={() => setView('home')} className={`px-3 py-1 rounded-md transition font-medium ${view === 'home' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}>{t.registerBtn}</button>
+                            <button onClick={() => setView('search')} className={`px-3 py-1 rounded-md transition font-medium ${view === 'search' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}>{t.searchBtn}</button>
+                            <button onClick={() => setView(isAdmin ? 'admin' : 'login')} className={`px-3 py-1 rounded-md transition font-medium ${view.includes('admin') || view === 'login' ? 'bg-blue-50 text-blue-600' : 'text-gray-500'}`}>{t.adminBtn}</button>
+                            
+                            {/* زر تغيير اللغة */}
+                            <button onClick={toggleLang} className="mr-2 ml-2 flex items-center gap-1 text-gray-600 hover:text-blue-600 font-bold border px-2 py-1 rounded-lg hover:bg-gray-50">
+                                <Icons.Globe /> {t.langBtn}
+                            </button>
+                        </div>
+                    </div>
+                </nav>
+            );
+
+            const Register = () => {
+                const [form, setForm] = useState({});
+                const [imgs, setImgs] = useState({});
+
+                const handleFile = (e, key) => {
+                    const file = e.target.files[0];
+                    if(file) {
+                        const reader = new FileReader();
+                        reader.onload = () => setImgs(prev => ({...prev, [key]: reader.result}));
+                        reader.readAsDataURL(file);
+                    }
+                }
+
+                const save = (e) => {
+                    e.preventDefault();
+                    const newStudent = {
+                        id: Date.now(),
+                        ...form,
+                        profilePic: imgs.profile,
+                        docPic: imgs.doc,
+                        regDate: new Date().toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US')
+                    };
+                    setStudents([...students, newStudent]);
+                    showNotify(t.savedSuccess);
+                    setForm({});
+                    setImgs({});
+                };
+
+                return (
+                    <div className="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-gray-100 fade-in mt-6">
+                        <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-2 flex items-center gap-2">
+                             <Icons.Plus /> {t.regTitle}
+                        </h2>
+                        <form onSubmit={save} className="space-y-6">
+                            <div className="grid md:grid-cols-2 gap-6">
+                                {fields.map(f => (
+                                    <div key={f.id}>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            {getFieldLabel(f.id, f.label)} {f.required && <span className="text-red-500">*</span>}
+                                        </label>
+                                        <input 
+                                            type={f.type} 
+                                            required={f.required}
+                                            className="input-primary"
+                                            value={form[f.id] || ''}
+                                            onChange={e => setForm({...form, [f.id]: e.target.value})}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <div className="grid md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border border-dashed border-gray-300">
+                                <div className="text-center">
+                                    <label className="cursor-pointer block group">
+                                        <div className="mx-auto w-24 h-24 bg-white border-2 border-gray-200 group-hover:border-blue-400 rounded-full flex items-center justify-center overflow-hidden mb-2 transition">
+                                            {imgs.profile ? <img src={imgs.profile} className="w-full h-full object-cover" /> : <Icons.Image className="text-gray-400" />}
+                                        </div>
+                                        <span className="text-sm text-blue-600 font-bold">{t.uploadPhoto}</span>
+                                        <input type="file" accept="image/*" className="hidden" onChange={e => handleFile(e, 'profile')} />
+                                    </label>
+                                </div>
+                                <div className="text-center">
+                                    <label className="cursor-pointer block group">
+                                        <div className="mx-auto w-full h-24 bg-white border-2 border-gray-200 group-hover:border-blue-400 rounded flex items-center justify-center overflow-hidden mb-2 transition">
+                                            {imgs.doc ? <img src={imgs.doc} className="w-full h-full object-cover" /> : <Icons.FileText className="text-gray-400" />}
+                                        </div>
+                                        <span className="text-sm text-blue-600 font-bold">{t.uploadDoc}</span>
+                                        <input type="file" accept="image/*" className="hidden" onChange={e => handleFile(e, 'doc')} />
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button className="btn-primary w-full">
+                                {t.saveData}
+                            </button>
+                        </form>
+                    </div>
+                );
+            };
+
+            const SearchPage = () => {
+                const [q, setQ] = useState('');
+                const results = students.filter(s => Object.values(s).some(v => String(v).toLowerCase().includes(q.toLowerCase())));
+
+                return (
+                    <div className="max-w-5xl mx-auto mt-6 px-4 fade-in">
+                        <div className="relative mb-8">
+                            <input 
+                                type="text" 
+                                placeholder={t.searchPlaceholder}
+                                className={`w-full p-4 rounded-full shadow-sm border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none text-lg ${lang === 'ar' ? 'pl-12 pr-4' : 'pr-12 pl-4'}`}
+                                value={q} onChange={e => setQ(e.target.value)}
+                            />
+                            <div className={`absolute top-1/2 -translate-y-1/2 text-gray-400 ${lang === 'ar' ? 'left-4' : 'right-4'}`}>
+                                <Icons.Search />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {results.map(s => (
+                                <div key={s.id} className="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition text-start">
+                                    <div className={`h-20 bg-gradient-to-r from-blue-600 to-blue-400 relative ${lang === 'ar' ? 'bg-gradient-to-l' : ''}`}>
+                                        <div className={`absolute -bottom-8 w-16 h-16 bg-white rounded-full p-1 shadow-sm ${lang === 'ar' ? 'right-4' : 'left-4'}`}>
+                                            {s.profilePic ? <img src={s.profilePic} className="w-full h-full rounded-full object-cover" /> : <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center text-gray-400"><Icons.User /></div>}
+                                        </div>
+                                    </div>
+                                    <div className="pt-10 p-4">
+                                        {fields.map(f => (
+                                            <div key={f.id} className="mb-2 border-b border-dashed border-gray-100 pb-1 last:border-0">
+                                                <span className="text-xs text-gray-500 block">{getFieldLabel(f.id, f.label)}</span>
+                                                <div className="font-semibold text-gray-800">{s[f.id] || '-'}</div>
+                                            </div>
+                                        ))}
+                                        {s.docPic && (
+                                            <button 
+                                                onClick={() => {
+                                                    const w = window.open(""); 
+                                                    w.document.write('<img src="'+s.docPic+'" style="max-width:100%; display:block; margin:auto"/>');
+                                                    w.document.title = t.attachTitle;
+                                                }} 
+                                                className="mt-3 w-full py-2 bg-blue-50 text-blue-600 rounded text-sm font-bold hover:bg-blue-100 transition"
+                                            >
+                                                {t.viewAttachment}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                            {results.length === 0 && <div className="col-span-full text-center text-gray-400 py-10 flex flex-col items-center gap-2"><Icons.Search /> {t.noResults}</div>}
+                        </div>
+                    </div>
+                );
+            };
+
+            const Admin = () => {
+                const [newField, setNewField] = useState('');
+                const [editId, setEditId] = useState(null);
+                const [editForm, setEditForm] = useState({});
+
+                const generateTestData = () => {
+                    const dummies = [
+                        { id: 1, name: 'محمد أحمد', nationalId: '10101010', phone: '0501234567', profilePic: null, docPic: null },
+                        { id: 2, name: 'Sarah John', nationalId: '20202020', phone: '0507654321', profilePic: null, docPic: null },
+                    ];
+                    setStudents([...students, ...dummies]);
+                    showNotify(t.dataGenerated);
+                };
+
+                const startEdit = (s) => { setEditId(s.id); setEditForm(s); };
+                const saveEdit = () => {
+                    setStudents(students.map(s => s.id === editId ? editForm : s));
+                    setEditId(null);
+                    showNotify(t.editSuccess);
+                };
+                const delStudent = (id) => {
+                    if(confirm(t.deleteConfirm)) setStudents(students.filter(s => s.id !== id));
+                };
+
+                return (
+                    <div className="max-w-6xl mx-auto mt-6 p-4 bg-white rounded-xl shadow-lg fade-in">
+                        <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 gap-4">
+                            <h2 className="text-2xl font-bold text-gray-800 flex gap-2 items-center"><Icons.Settings /> {t.adminPanel}</h2>
+                            <div className="flex gap-2">
+                                <button onClick={generateTestData} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 text-sm font-bold flex items-center gap-2 shadow-sm">
+                                    <Icons.Database /> {t.testData}
+                                </button>
+                                <button onClick={() => {setIsAdmin(false); setView('home')}} className="text-red-500 bg-red-50 px-4 py-2 hover:bg-red-100 rounded text-sm font-bold border border-red-100">{t.logout}</button>
+                            </div>
+                        </div>
+
+                        <div className="grid lg:grid-cols-3 gap-8">
+                            {/* إدارة الحقول */}
+                            <div className="lg:col-span-1 bg-gray-50 p-5 rounded-xl h-fit border border-gray-200">
+                                <h3 className="font-bold mb-4 text-lg text-gray-700 border-b pb-2">{t.addFields}</h3>
+                                <div className="flex gap-2 mb-4">
+                                    <input value={newField} onChange={e => setNewField(e.target.value)} placeholder={t.fieldPlaceholder} className="flex-1 p-2 border rounded-lg text-start" />
+                                    <button onClick={() => {
+                                        if(newField) {
+                                            setFields([...fields, { id: 'f_'+Date.now(), label: newField, type: 'text' }]);
+                                            setNewField('');
+                                        }
+                                    }} className="bg-blue-600 text-white px-3 rounded-lg hover:bg-blue-700"><Icons.Plus /></button>
+                                </div>
+                                <ul className="space-y-2">
+                                    {fields.map(f => (
+                                        <li key={f.id} className="bg-white p-3 rounded-lg shadow-sm border flex justify-between items-center">
+                                            <span className="font-medium text-gray-700">{getFieldLabel(f.id, f.label)}</span>
+                                            {!['name','nationalId'].includes(f.id) && 
+                                                <button onClick={() => setFields(fields.filter(x => x.id !== f.id))} className="text-red-500 hover:bg-red-50 p-1 rounded"><Icons.Trash /></button>
+                                            }
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+
+                            {/* جدول البيانات */}
+                            <div className="lg:col-span-2 overflow-x-auto">
+                                <table className="w-full text-start border-collapse min-w-[500px]">
+                                    <thead className="bg-slate-100 text-slate-700 text-sm font-bold">
+                                        <tr>
+                                            <th className={`p-3 ${lang === 'ar' ? 'rounded-r-lg' : 'rounded-l-lg'}`}>{t.name}</th>
+                                            <th className="p-3">{t.nationalId}</th>
+                                            <th className={`p-3 ${lang === 'ar' ? 'rounded-l-lg' : 'rounded-r-lg'}`}>{t.actions}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {students.map(s => (
+                                            <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                                                {editId === s.id ? (
+                                                    <>
+                                                        <td className="p-2"><input value={editForm.name} onChange={e=>setEditForm({...editForm, name:e.target.value})} className="w-full border p-2 rounded text-start bg-yellow-50"/></td>
+                                                        <td className="p-2"><input value={editForm.nationalId} onChange={e=>setEditForm({...editForm, nationalId:e.target.value})} className="w-full border p-2 rounded text-start bg-yellow-50"/></td>
+                                                        <td className="p-2 flex gap-2">
+                                                            <button onClick={saveEdit} className="text-green-600 bg-green-100 p-2 rounded hover:bg-green-200"><Icons.Plus /></button>
+                                                            <button onClick={() => setEditId(null)} className="text-gray-500 bg-gray-100 p-2 rounded hover:bg-gray-200"><Icons.Plus className="rotate-45" /></button>
+                                                        </td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <td className="p-3 text-gray-800 font-medium">{s.name}</td>
+                                                        <td className="p-3 font-mono text-gray-600">{s.nationalId}</td>
+                                                        <td className="p-3 flex gap-2">
+                                                            <button onClick={() => startEdit(s)} className="text-blue-600 hover:bg-blue-100 p-2 rounded"><Icons.Edit /></button>
+                                                            <button onClick={() => delStudent(s.id)} className="text-red-600 hover:bg-red-100 p-2 rounded"><Icons.Trash /></button>
+                                                        </td>
+                                                    </>
+                                                )}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {students.length === 0 && <div className="text-center py-10 text-gray-400">{t.listEmpty}</div>}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const Login = () => {
+                const [pass, setPass] = useState('');
+                return (
+                    <div className="flex justify-center items-center min-h-[60vh] fade-in p-4">
+                        <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm text-center border border-gray-100">
+                            <div className="mx-auto w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4"><Icons.Lock /></div>
+                            <h2 className="text-xl font-bold mb-6 text-gray-800">{t.loginTitle}</h2>
+                            <input 
+                                type="password" 
+                                placeholder={t.passPlaceholder} 
+                                className="input-primary mb-4 text-center ltr" 
+                                value={pass} 
+                                onChange={e => setPass(e.target.value)} 
+                            />
+                            <button onClick={() => {
+                                if(pass === '1234') { setIsAdmin(true); setView('admin'); }
+                                else showNotify(t.passWrong, 'error');
+                            }} className="btn-primary w-full">
+                                {t.loginBtn}
+                            </button>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    <Navbar />
+                    {notification && (
+                        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full shadow-lg text-white font-bold fade-in flex items-center gap-2 ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-600'}`}>
+                            {notification.msg}
+                        </div>
+                    )}
+                    <main className="flex-1 bg-slate-50 pb-10">
+                        {view === 'home' && <Register />}
+                        {view === 'search' && <SearchPage />}
+                        {view === 'login' && <Login />}
+                        {view === 'admin' && <Admin />}
+                    </main>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
+
