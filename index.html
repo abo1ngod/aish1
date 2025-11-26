@@ -10,22 +10,30 @@
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Tajawal', sans-serif; }
-        /* تأثير ضبابي عند التحميل */
-        .loading { opacity: 0.5; pointer-events: none; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 pb-20">
 
     <!-- رأس الصفحة -->
     <header class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
-        <div class="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
             <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
                 <span class="bg-blue-600 text-white p-1.5 rounded-lg shadow-sm">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                 </span>
                 منصة الرأي الحر
             </h1>
-            <span id="postCount" class="text-xs font-bold bg-slate-100 px-3 py-1 rounded-full text-slate-600 border border-slate-200">جاري التحميل...</span>
+            
+            <!-- منطقة العدادات -->
+            <div class="flex flex-col items-end">
+                <span id="postCount" class="text-xs font-bold bg-slate-100 px-3 py-1 rounded-full text-slate-600 border border-slate-200 mb-1">
+                    جاري التحميل...
+                </span>
+                <span id="pageViews" class="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    0 زيارة للصفحة
+                </span>
+            </div>
         </div>
     </header>
 
@@ -50,7 +58,6 @@
 
         <!-- حاوية المنشورات -->
         <div id="postsContainer" class="space-y-6">
-            <!-- سيتم تحميل المنشورات هنا -->
             <div class="animate-pulse space-y-4">
                 <div class="h-40 bg-slate-200 rounded-2xl"></div>
                 <div class="h-40 bg-slate-200 rounded-2xl"></div>
@@ -61,14 +68,12 @@
 
     <!-- سكريبت التطبيق -->
     <script type="module">
-        // استيراد المكتبات الضرورية من CDN
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, increment, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        // أضفت setDoc و getDoc للتعامل مع عداد الزيارات
+        import { getFirestore, collection, addDoc, onSnapshot, updateDoc, setDoc, getDoc, doc, increment, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // ---------------------------------------------------------
-        // إعدادات مشروعك الخاصة (تم دمجها هنا)
-        // ---------------------------------------------------------
+        // إعدادات قاعدة البيانات الخاصة بك
         const firebaseConfig = {
             apiKey: "AIzaSyBxPO6RKsQ1Cq-mqlCpFTrCuIyxnYdB37U",
             authDomain: "studentsystem-c1ab1.firebaseapp.com",
@@ -78,83 +83,86 @@
             messagingSenderId: "112215023848",
             appId: "1:112215023848:web:0adba326a527ee7e37e95d"
         };
-        // ---------------------------------------------------------
 
-        // تهيئة فايربيس
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        const COLLECTION_NAME = "public_opinions"; // اسم المجموعة في قاعدة البيانات
+        const COLLECTION_NAME = "public_opinions";
+        const STATS_DOC_ID = "global_stats"; // معرف مستند الإحصائيات
         let currentUser = null;
 
-        // 1. تسجيل الدخول المجهول (ضروري للكتابة في القاعدة)
+        // 1. تسجيل الدخول
         signInAnonymously(auth)
             .then((userCredential) => {
                 currentUser = userCredential.user;
-                console.log("تم الاتصال بنجاح. معرف المستخدم:", currentUser.uid);
+                console.log("تم الاتصال. المعرف:", currentUser.uid);
                 startApp();
+                incrementPageViews(); // زيادة عداد زيارات الصفحة عند الدخول
             })
             .catch((error) => {
-                console.error("خطأ في الاتصال:", error);
-                document.getElementById('postsContainer').innerHTML = `
-                    <div class="bg-red-50 text-red-600 p-4 rounded-xl border border-red-200 text-center">
-                        <strong>عفواً، لم نتمكن من الاتصال بقاعدة البيانات</strong><br>
-                        الرجاء التأكد من تفعيل "Anonymous Auth" في لوحة تحكم فايربيس.
-                    </div>
-                `;
+                console.error("خطأ:", error);
             });
 
-        // 2. تشغيل التطبيق والاستماع للبيانات
         function startApp() {
             const q = query(collection(db, COLLECTION_NAME), orderBy("timestamp", "desc"));
             
             onSnapshot(q, (snapshot) => {
                 const container = document.getElementById('postsContainer');
                 document.getElementById('postCount').innerText = snapshot.size + " مشاركة";
-                container.innerHTML = ""; // تنظيف الحاوية
+                container.innerHTML = "";
 
                 if (snapshot.empty) {
-                    container.innerHTML = `<div class="text-center text-slate-400 py-10">لا توجد مشاركات بعد. كن أول من يكتب!</div>`;
+                    container.innerHTML = `<div class="text-center text-slate-400 py-10">لا توجد مشاركات بعد.</div>`;
                     return;
                 }
 
                 snapshot.forEach((docSnapshot) => {
-                    const data = docSnapshot.data();
-                    const id = docSnapshot.id;
-                    createPostElement(id, data, container);
+                    createPostElement(docSnapshot.id, docSnapshot.data(), container);
                 });
-            }, (error) => {
-                console.error("خطأ في جلب البيانات:", error);
-                if (error.code === 'permission-denied') {
-                    document.getElementById('postsContainer').innerHTML = `
-                        <div class="bg-yellow-50 text-yellow-700 p-4 rounded-xl border border-yellow-200 text-center">
-                            <strong>خطأ في الصلاحيات (Permission Denied)</strong><br>
-                            الرجاء الذهاب لـ Firestore Rules وتغيير القواعد إلى:<br>
-                            <code>allow read, write: if true;</code>
-                        </div>
+            });
+
+            // الاستماع لتغييرات عداد زيارات الصفحة
+            const statsRef = doc(db, 'app_metadata', STATS_DOC_ID);
+            onSnapshot(statsRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const views = docSnap.data().totalPageViews || 0;
+                    document.getElementById('pageViews').innerHTML = `
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        ${views} زيارة للصفحة
                     `;
                 }
             });
         }
 
-        // 3. إنشاء عنصر المنشور (HTML)
+        // دالة جديدة: زيادة عداد زيارات الصفحة (مستند منفصل)
+        async function incrementPageViews() {
+            const statsRef = doc(db, 'app_metadata', STATS_DOC_ID);
+            try {
+                // محاولة تحديث العداد
+                await updateDoc(statsRef, {
+                    totalPageViews: increment(1)
+                });
+            } catch (error) {
+                // إذا لم يكن المستند موجوداً، نقوم بإنشائه (لأول مرة فقط)
+                if (error.code === 'not-found') {
+                    await setDoc(statsRef, { totalPageViews: 1 });
+                }
+            }
+        }
+
         function createPostElement(id, post, container) {
             const views = post.views || 0;
             const likes = post.likes || 0;
             const dislikes = post.dislikes || 0;
 
-            // معادلات القبول والرفض
-            // ننتظر حتى يصل 5 مشاهدات على الأقل قبل الحكم
             const isRejected = views > 5 && (dislikes / views) > 0.50; 
             const isFeatured = views > 5 && (likes / views) > 0.80;
 
-            // حساب النسب للشريط
             const likePercent = views > 0 ? (likes / views) * 100 : 0;
             const dislikePercent = views > 0 ? (dislikes / views) * 100 : 0;
 
             const div = document.createElement('div');
-            // تحديد التصميم بناء على الحالة
             let cardClass = "relative bg-white p-6 rounded-2xl border transition-all duration-500 ";
             if (isRejected) cardClass += "border-red-200 bg-red-50";
             else if (isFeatured) cardClass += "border-amber-300 shadow-md ring-1 ring-amber-100 bg-gradient-to-br from-white to-amber-50";
@@ -165,7 +173,6 @@
             let innerHTML = '';
 
             if (isRejected) {
-                // تصميم المحتوى المرفوض
                 innerHTML = `
                     <div class="text-center py-8 opacity-75">
                         <div class="text-red-500 font-bold text-xl mb-2 flex justify-center items-center gap-2">
@@ -176,12 +183,8 @@
                     </div>
                 `;
             } else {
-                // تصميم المحتوى العادي / المميز
                 const badge = isFeatured ? 
-                    `<div class="absolute -top-3 right-6 bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1 z-10">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                        محتوى مميز
-                    </div>` : '';
+                    `<div class="absolute -top-3 right-6 bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1 z-10">★ محتوى مميز</div>` : '';
 
                 innerHTML = `
                     ${badge}
@@ -220,14 +223,12 @@
                         </button>
                     </div>
                     
-                    <!-- شريط المؤشر -->
                     <div class="mt-4 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden flex">
                         <div class="bg-green-500 h-full" style="width: ${likePercent}%"></div>
                         <div class="bg-red-500 h-full" style="width: ${dislikePercent}%"></div>
                     </div>
                 `;
 
-                // تفعيل مراقب المشاهدة عند ظهور العنصر
                 setTimeout(() => observeView(id, div), 500);
             }
 
@@ -235,16 +236,12 @@
             container.appendChild(div);
         }
 
-        // 4. منطق إضافة المنشور
         window.addPost = async () => {
             const contentIn = document.getElementById('contentInput');
             const authorIn = document.getElementById('authorInput');
             const btn = document.getElementById('submitBtn');
 
-            if (!contentIn.value.trim()) {
-                contentIn.focus();
-                return;
-            }
+            if (!contentIn.value.trim()) { contentIn.focus(); return; }
 
             btn.disabled = true;
             btn.innerHTML = `<span class="animate-spin ml-2">⏳</span> جاري النشر...`;
@@ -261,29 +258,28 @@
                 contentIn.value = "";
                 authorIn.value = "";
             } catch (e) {
-                alert("خطأ أثناء النشر: " + e.message);
+                alert("خطأ: " + e.message);
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = `نشر المشاركة <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" transform="rotate(180)"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
             }
         };
 
-        // 5. منطق التصويت
+        // تعديل: التصويت لا يزيد المشاهدات (views)
         window.handleVote = async (id, type) => {
             if (localStorage.getItem(`voted_${id}`)) {
-                alert("لقد قمت بالتصويت مسبقاً على هذا المنشور.");
+                alert("لقد قمت بالتصويت مسبقاً.");
                 return;
             }
             
             const docRef = doc(db, COLLECTION_NAME, id);
             await updateDoc(docRef, {
-                [type]: increment(1),
-                views: increment(1) // التصويت يعتبر مشاهدة أيضاً
+                [type]: increment(1)
+                // تم إزالة: views: increment(1)
             });
             localStorage.setItem(`voted_${id}`, 'true');
         };
 
-        // 6. منطق احتساب المشاهدة عند الظهور (Intersection Observer)
         function observeView(id, element) {
             const observer = new IntersectionObserver((entries) => {
                 if (entries[0].isIntersecting) {
@@ -294,19 +290,13 @@
                     }
                     observer.disconnect();
                 }
-            }, { threshold: 0.5 }); // يجب أن يظهر 50% من العنصر لاحتساب المشاهدة
+            }, { threshold: 0.5 });
             observer.observe(element);
         }
 
-        // دالة حماية النصوص
         function escapeHtml(text) {
             if (!text) return text;
-            return text
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
     </script>
 </body>
