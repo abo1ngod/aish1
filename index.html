@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بوابتي الرقمية - روابطي ومشاريعي</title>
+    
+    <!-- Tailwind CSS (للتصميم) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM (المحرك) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel (لترجمة الكود) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Lucide Icons (الأيقونات) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Google Fonts (خط تجوال) -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Tajawal', sans-serif; background-color: #0f172a; color: #f8fafc; overflow-x: hidden; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .gradient-text { background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Loader */
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+
+        // --- إعدادات فايربيس الخاصة بك ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBxPO6RKsQ1Cq-mqlCpFTrCuIyxnYdB37U",
+            authDomain: "studentsystem-c1ab1.firebaseapp.com",
+            databaseURL: "https://studentsystem-c1ab1-default-rtdb.firebaseio.com",
+            projectId: "studentsystem-c1ab1",
+            storageBucket: "studentsystem-c1ab1.firebasestorage.app",
+            messagingSenderId: "112215023848",
+            appId: "1:112215023848:web:0adba326a527ee7e37e95d"
+        };
+
+        // تهيئة التطبيق
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        // اسم المجموعة في قاعدة البيانات
+        const COLLECTION_NAME = "my_links_tree"; 
+
+        const { useState, useEffect } = React;
+        const { Search, Link: LinkIcon, ExternalLink, Copy, Share2, Settings, Plus, Trash2, Edit2, Check, X, Save, LogOut, Loader2, Smartphone, Mail, Globe } = lucide;
+
+        const App = () => {
+            const [links, setLinks] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [searchTerm, setSearchTerm] = useState("");
+            
+            // Auth & Admin State
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [showLoginModal, setShowLoginModal] = useState(false);
+            const [showEditorModal, setShowEditorModal] = useState(false);
+            
+            // Editor Data
+            const [currentLink, setCurrentLink] = useState(null);
+            const [formData, setFormData] = useState({ title: "", desc: "", url: "", category: "عام" });
+
+            // Toast
+            const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+
+            // Hardcoded Admin Credentials for UI Lock (Security depends on Firebase Rules mostly)
+            const ADMIN_USER = "admin";
+            const ADMIN_PASS = "123456";
+
+            // 1. الاتصال بقاعدة البيانات عند التحميل
+            useEffect(() => {
+                // تسجيل دخول مجهول لقراءة البيانات (مهم لفايربيس)
+                signInAnonymously(auth).catch(err => console.error("Auth Error:", err));
+
+                const q = query(collection(db, COLLECTION_NAME), orderBy("created_at", "desc"));
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const linksData = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    setLinks(linksData);
+                    setLoading(false);
+                    // Refresh Icons
+                    setTimeout(() => lucide.createIcons(), 100);
+                }, (error) => {
+                    console.error("Error fetching links:", error);
+                    setLoading(false);
+                });
+
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                lucide.createIcons();
+            }, [links, isAdmin, showLoginModal, showEditorModal]);
+
+            // --- دوال المساعدة ---
+            const showToast = (msg, type = "success") => {
+                setToast({ show: true, message: msg, type });
+                setTimeout(() => setToast({ ...toast, show: false }), 3000);
+            };
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if (e.target.username.value === ADMIN_USER && e.target.password.value === ADMIN_PASS) {
+                    setIsAdmin(true);
+                    setShowLoginModal(false);
+                    showToast("أهلاً بك أيها المدير");
+                } else {
+                    showToast("بيانات خطأ", "error");
+                }
+            };
+
+            const handleShare = async (link) => {
+                const shareData = {
+                    title: link.title,
+                    text: link.desc,
+                    url: link.url
+                };
+
+                // محاولة استخدام ميزة المشاركة الأصلية في الجوال
+                if (navigator.share) {
+                    try {
+                        await navigator.share(shareData);
+                        showToast("تم فتح قائمة المشاركة");
+                    } catch (err) {
+                        console.log("تم إلغاء المشاركة");
+                    }
+                } else {
+                    // إذا كان كمبيوتر: نسخ الرابط وفتح الواتساب ويب كمثال
+                    navigator.clipboard.writeText(link.url);
+                    showToast("تم نسخ الرابط! (المتصفح لا يدعم المشاركة المباشرة)");
+                }
+            };
+
+            const copyToClipboard = (text) => {
+                navigator.clipboard.writeText(text).then(() => showToast("تم نسخ الرابط بنجاح!"));
+            };
+
+            // --- عمليات قاعدة البيانات (CRUD) ---
+            const saveLink = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                try {
+                    const dataToSave = {
+                        ...formData,
+                        created_at: Date.now()
+                    };
+
+                    if (currentLink) {
+                        // تحديث
+                        const docRef = doc(db, COLLECTION_NAME, currentLink.id);
+                        await updateDoc(docRef, dataToSave);
+                        showToast("تم التحديث بنجاح");
+                    } else {
+                        // إضافة جديد
+                        await addDoc(collection(db, COLLECTION_NAME), dataToSave);
+                        showToast("تمت الإضافة بنجاح");
+                    }
+                    setShowEditorModal(false);
+                } catch (error) {
+                    console.error("Error saving:", error);
+                    showToast("حدث خطأ أثناء الحفظ", "error");
+                }
+                setLoading(false);
+            };
+
+            const handleDelete = async (id) => {
+                if(confirm("هل أنت متأكد من الحذف النهائي؟")) {
+                    try {
+                        await deleteDoc(doc(db, COLLECTION_NAME, id));
+                        showToast("تم الحذف");
+                    } catch (error) {
+                        showToast("خطأ في الحذف", "error");
+                    }
+                }
+            };
+
+            const openEditor = (link = null) => {
+                setCurrentLink(link);
+                setFormData(link ? { title: link.title, desc: link.desc, url: link.url, category: link.category } : { title: "", desc: "", url: "", category: "عام" });
+                setShowEditorModal(true);
+            };
+
+            // تصفية النتائج
+            const filteredLinks = links.filter(link => 
+                link.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                link.desc.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            return (
+                <div className="min-h-screen pb-12 relative overflow-hidden">
+                    {/* خلفية جمالية */}
+                    <div className="absolute top-0 left-0 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none"></div>
+                    <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 z-0 pointer-events-none"></div>
+
+                    <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6">
+                        
+                        {/* الهيدر */}
+                        <header className="py-12 text-center animate-fade-in">
+                            <div className="w-24 h-24 mx-auto bg-gradient-to-tr from-blue-500 to-purple-600 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-blue-500/20 ring-4 ring-slate-800">
+                                <i data-lucide="globe" className="text-white w-10 h-10"></i>
+                            </div>
+                            <h1 className="text-4xl md:text-5xl font-extrabold mb-4 tracking-tight">
+                                مرحباً بك في <span className="gradient-text">بوابتي الرقمية</span>
+                            </h1>
+                            <p className="text-slate-400 text-lg max-w-2xl mx-auto leading-relaxed">
+                                بوابتك الشاملة لجميع مشاريعي، خدماتي، وروابطي الهامة. يتم تحديث القائمة تلقائياً.
+                            </p>
+                            
+                            {/* البحث */}
+                            <div className="mt-8 relative max-w-md mx-auto group">
+                                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                                    <i data-lucide="search" className="text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors"></i>
+                                </div>
+                                <input 
+                                    type="text" 
+                                    placeholder="ابحث..." 
+                                    className="w-full pr-12 pl-4 py-4 rounded-2xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-lg backdrop-blur-sm"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </header>
+
+                        {/* أدوات المدير */}
+                        {isAdmin && (
+                            <div className="mb-8 p-4 glass-card rounded-2xl flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-blue-500 animate-fade-in">
+                                <div className="flex items-center gap-2 text-blue-400">
+                                    <i data-lucide="settings" className="w-5 h-5"></i>
+                                    <span className="font-bold">لوحة التحكم (متصل بقاعدة البيانات)</span>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => openEditor()} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition-colors text-sm font-medium shadow-lg shadow-blue-600/20">
+                                        <i data-lucide="plus" className="w-4 h-4"></i> إضافة رابط جديد
+                                    </button>
+                                    <button onClick={() => setIsAdmin(false)} className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-xl transition-colors text-sm font-medium">
+                                        <i data-lucide="log-out" className="w-4 h-4"></i> خروج
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* شبكة الروابط */}
+                        {loading ? (
+                            <div className="flex justify-center py-20">
+                                <div className="loader"></div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {filteredLinks.length > 0 ? (
+                                    filteredLinks.map(link => (
+                                        <div key={link.id} className="glass-card p-5 rounded-2xl hover:bg-slate-800/80 transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/10 border border-slate-700/50 animate-fade-in">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div className="p-3 bg-slate-800/80 rounded-xl text-blue-400 group-hover:text-white group-hover:bg-blue-600 transition-colors duration-300">
+                                                    <i data-lucide="link" className="w-6 h-6"></i>
+                                                </div>
+                                                <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg backdrop-blur-md">
+                                                    <button onClick={() => copyToClipboard(link.url)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors relative" title="نسخ">
+                                                        <i data-lucide="copy" className="w-4 h-4"></i>
+                                                    </button>
+                                                    <button onClick={() => handleShare(link)} className="p-2 text-green-400 hover:text-white hover:bg-green-600 rounded-lg transition-colors" title="مشاركة عبر واتساب/إيميل">
+                                                        <i data-lucide="share-2" className="w-4 h-4"></i>
+                                                    </button>
+                                                    <a href={link.url} target="_blank" className="p-2 text-blue-400 hover:text-white hover:bg-blue-600 rounded-lg transition-colors" title="فتح">
+                                                        <i data-lucide="external-link" className="w-4 h-4"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                            
+                                            <h3 className="text-xl font-bold text-white mb-1 group-hover:text-blue-400 transition-colors">{link.title}</h3>
+                                            <p className="text-slate-400 text-sm mb-4 line-clamp-2 leading-relaxed">{link.desc}</p>
+                                            
+                                            <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-700/50">
+                                                <span className="text-xs font-medium px-2 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700/50">
+                                                    {link.category}
+                                                </span>
+                                                
+                                                {isAdmin && (
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => openEditor(link)} className="text-yellow-500 hover:text-yellow-400 transition-colors p-1">
+                                                            <i data-lucide="edit-2" className="w-4 h-4"></i>
+                                                        </button>
+                                                        <button onClick={() => handleDelete(link.id)} className="text-red-500 hover:text-red-400 transition-colors p-1">
+                                                            <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="col-span-full text-center py-12 opacity-50">
+                                        <i data-lucide="search" className="w-12 h-12 mx-auto mb-2"></i>
+                                        <p>لا توجد روابط مطابقة</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* تذييل */}
+                        <footer className="mt-16 text-center text-slate-500 pb-8 text-sm">
+                            <p className="mb-4">&copy; {new Date().getFullYear()} جميع الحقوق محفوظة.</p>
+                            {!isAdmin && (
+                                <button onClick={() => setShowLoginModal(true)} className="px-4 py-2 rounded-full border border-slate-800 hover:border-slate-700 hover:bg-slate-800 transition-all text-xs flex items-center gap-2 mx-auto">
+                                    <i data-lucide="settings" className="w-3 h-3"></i> دخول المطور
+                                </button>
+                            )}
+                        </footer>
+                    </div>
+
+                    {/* مودال تسجيل الدخول */}
+                    {showLoginModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+                            <div className="glass-card w-full max-w-sm p-6 rounded-2xl shadow-2xl relative border-slate-700">
+                                <button onClick={() => setShowLoginModal(false)} className="absolute left-4 top-4 text-slate-400 hover:text-white">
+                                    <i data-lucide="x" className="w-5 h-5"></i>
+                                </button>
+                                <div className="text-center mb-6">
+                                    <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <i data-lucide="settings" className="text-blue-500"></i>
+                                    </div>
+                                    <h2 className="text-xl font-bold text-white">منطقة الإدارة</h2>
+                                </div>
+                                <form onSubmit={handleLogin} className="space-y-4">
+                                    <input name="username" type="text" className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" placeholder="اسم المستخدم" required />
+                                    <input name="password" type="password" className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" placeholder="كلمة المرور" required />
+                                    <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/20">
+                                        تسجيل الدخول
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* مودال المحرر (الإضافة والتعديل) */}
+                    {showEditorModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+                            <div className="glass-card w-full max-w-lg p-6 rounded-2xl shadow-2xl relative border-slate-700">
+                                <div className="flex justify-between items-center mb-6 border-b border-slate-700/50 pb-4">
+                                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                        {currentLink ? <><i data-lucide="edit-2" className="w-5 h-5 text-yellow-500"></i> تعديل الرابط</> : <><i data-lucide="plus" className="w-5 h-5 text-blue-500"></i> إضافة رابط جديد</>}
+                                    </h2>
+                                    <button onClick={() => setShowEditorModal(false)} className="text-slate-400 hover:text-white bg-slate-800 p-1 rounded-full">
+                                        <i data-lucide="x" className="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                                <form onSubmit={saveLink} className="space-y-4">
+                                    <div>
+                                        <label className="text-xs text-slate-400 mb-1 block">عنوان الصفحة/الخدمة</label>
+                                        <input 
+                                            value={formData.title}
+                                            onChange={(e) => setFormData({...formData, title: e.target.value})}
+                                            type="text" 
+                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" 
+                                            placeholder="مثال: معرض أعمالي" required 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-slate-400 mb-1 block">وصف مختصر</label>
+                                        <textarea 
+                                            value={formData.desc}
+                                            onChange={(e) => setFormData({...formData, desc: e.target.value})}
+                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 h-20 resize-none" 
+                                            placeholder="وصف يظهر للزوار..." required 
+                                        ></textarea>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-xs text-slate-400 mb-1 block">الرابط URL</label>
+                                            <input 
+                                                value={formData.url}
+                                                onChange={(e) => setFormData({...formData, url: e.target.value})}
+                                                type="text" 
+                                                dir="ltr"
+                                                className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" 
+                                                placeholder="https://..." required 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-slate-400 mb-1 block">التصنيف</label>
+                                            <input 
+                                                value={formData.category}
+                                                onChange={(e) => setFormData({...formData, category: e.target.value})}
+                                                type="text" 
+                                                className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" 
+                                                placeholder="شخصي، برمجة..." 
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="pt-4 flex gap-3">
+                                        <button type="submit" disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2">
+                                            {loading ? <i data-lucide="loader-2" className="animate-spin"></i> : <i data-lucide="save" className="w-4 h-4"></i>}
+                                            {loading ? "جاري الحفظ..." : "حفظ البيانات"}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* التنبيهات (Toast) */}
+                    {toast.show && (
+                        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-50 animate-fade-in ${toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-600'} text-white`}>
+                            {toast.type === 'error' ? <i data-lucide="x" className="w-5 h-5"></i> : <i data-lucide="check" className="w-5 h-5"></i>}
+                            <span className="font-medium">{toast.message}</span>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
+
