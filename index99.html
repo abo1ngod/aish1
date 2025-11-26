@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام نقاط الطلاب المتميزين</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body { font-family: 'Cairo', sans-serif; background-color: #f3f4f6; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .active-tab { background-color: #2563eb; color: white; border-bottom: 3px solid #1e40af; }
+        .inactive-tab { background-color: white; color: #4b5563; }
+        input[type="checkbox"] { accent-color: #2563eb; width: 1.25rem; height: 1.25rem; }
+        /* Scrollbar for tables */
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="bg-white shadow-md mb-6 sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-blue-800 flex items-center gap-2">
+                <i data-lucide="graduation-cap"></i>
+                نظام نقاط الطلاب
+            </h1>
+            <div class="text-sm text-gray-500 font-semibold">لوحة الإدارة المتقدمة</div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-4 pb-10">
+        
+        <!-- Navigation Tabs -->
+        <div class="flex flex-wrap mb-6 shadow-sm rounded-lg overflow-hidden border border-gray-200">
+            <button onclick="switchTab('admin')" id="tab-admin" class="flex-1 py-4 px-4 font-bold text-lg text-center transition-colors flex justify-center items-center gap-2 active-tab">
+                <i data-lucide="settings" size="20"></i> لوحة التحكم للمعلم
+            </button>
+            <button onclick="switchTab('display')" id="tab-display" class="flex-1 py-4 px-4 font-bold text-lg text-center transition-colors flex justify-center items-center gap-2 inactive-tab">
+                <i data-lucide="trophy" size="20"></i> لوحة الشرف
+            </button>
+        </div>
+
+        <!-- Notification Toast -->
+        <div id="toast" class="fixed top-4 left-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg transform -translate-y-20 transition-transform duration-300 z-50 flex items-center gap-2">
+            <i data-lucide="check-circle"></i>
+            <span id="toast-message">تمت العملية بنجاح</span>
+        </div>
+
+        <!-- SECTION 1: ADMIN PANEL (Protected) -->
+        <section id="section-admin" class="fade-in">
+            
+            <!-- Login Screen -->
+            <div id="admin-login" class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-lg text-center mt-10">
+                <div class="mb-4 text-blue-600 flex justify-center"><i data-lucide="lock" size="48"></i></div>
+                <h2 class="text-2xl font-bold mb-4 text-gray-800">الدخول للوحة التحكم</h2>
+                <p class="text-gray-500 mb-4 text-sm">كلمة المرور الافتراضية: 1234</p>
+                <input type="password" id="adminPasswordInput" class="w-full p-3 border border-gray-300 rounded-lg mb-4 text-center text-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="أدخل كلمة المرور">
+                <button onclick="checkPassword()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow transition transform hover:scale-105">دخول</button>
+            </div>
+
+            <!-- Admin Dashboard (Hidden by default) -->
+            <div id="admin-dashboard" class="hidden space-y-8">
+                
+                <!-- 1. Points Recording -->
+                <div class="bg-white p-6 rounded-lg shadow-lg border-t-4 border-yellow-500">
+                    <h2 class="text-xl font-bold mb-6 text-gray-800 flex items-center gap-2 pb-2 border-b">
+                        <i data-lucide="star" class="text-yellow-500"></i> رصد النقاط
+                    </h2>
+
+                    <div class="mb-6">
+                        <label class="block text-gray-700 mb-2 font-semibold">اختر الطالب</label>
+                        <select id="pointsStudentSelect" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none bg-gray-50 text-lg">
+                            <option value="">-- اختر طالباً --</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Positive Points -->
+                        <div class="border border-green-200 bg-green-50 rounded-xl p-4">
+                            <h3 class="font-bold text-green-800 mb-3 flex items-center gap-2 text-lg">
+                                <i data-lucide="plus-circle"></i> إيجابي
+                            </h3>
+                            <div id="pointsPosContainer" class="space-y-3 max-h-60 overflow-y-auto custom-scroll pr-1">
+                                <!-- Injected via JS -->
+                            </div>
+                        </div>
+
+                        <!-- Negative Points -->
+                        <div class="border border-red-200 bg-red-50 rounded-xl p-4">
+                            <h3 class="font-bold text-red-800 mb-3 flex items-center gap-2 text-lg">
+                                <i data-lucide="minus-circle"></i> سلبي
+                            </h3>
+                            <div id="pointsNegContainer" class="space-y-3 max-h-60 overflow-y-auto custom-scroll pr-1">
+                                <!-- Injected via JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6">
+                        <button onclick="applyPoints()" class="w-full bg-gray-800 hover:bg-black text-white font-bold py-4 rounded-lg shadow-lg text-lg flex justify-center items-center gap-2 transition transform hover:scale-[1.01]">
+                            <i data-lucide="check-square"></i> تنفيذ وحفظ النقاط
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. Manage Students -->
+                <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-blue-600">
+                    <div class="flex justify-between items-center mb-4 pb-2 border-b">
+                        <h3 class="text-lg font-bold flex items-center gap-2 text-gray-800">
+                            <i data-lucide="users" class="text-blue-600"></i> إدارة الطلاب
+                        </h3>
+                        <button onclick="resetStudentForm()" id="cancelEditStudentBtn" class="hidden text-xs text-red-500 hover:underline">إلغاء التعديل</button>
+                    </div>
+                    
+                    <!-- Add/Edit Student Form -->
+                    <form onsubmit="handleStudentForm(event)" class="flex gap-3 mb-6 bg-blue-50 p-4 rounded-lg">
+                        <input type="hidden" id="studentIdInput"> <!-- Hidden ID for editing -->
+                        <input type="text" id="studentNameInput" class="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="اسم الطالب..." required>
+                        <button type="submit" id="studentSubmitBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 font-bold shadow transition min-w-[120px] justify-center">
+                            <i data-lucide="plus"></i> إضافة
+                        </button>
+                    </form>
+
+                    <!-- Students List -->
+                    <div class="overflow-y-auto max-h-60 custom-scroll border rounded-lg">
+                        <table class="w-full text-right bg-white">
+                            <thead class="bg-gray-100 sticky top-0 z-10">
+                                <tr>
+                                    <th class="p-3 text-sm font-bold text-gray-600">الاسم</th>
+                                    <th class="p-3 text-sm font-bold text-gray-600 text-center w-32">الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminStudentsList" class="divide-y divide-gray-100">
+                                <!-- Dynamic List -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 3. Manage Rating Items (Settings) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <!-- Positive Items Settings -->
+                    <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-green-500 relative">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-green-700 flex items-center gap-2">
+                                <i data-lucide="settings-2"></i> بنود إيجابية
+                            </h3>
+                            <button onclick="resetItemForm('positive')" id="cancelEditPosBtn" class="hidden text-xs text-red-500 hover:underline">إلغاء</button>
+                        </div>
+
+                        <form onsubmit="handleItemForm(event, 'positive')" class="mb-4 space-y-2 bg-green-50 p-3 rounded border border-green-100">
+                            <input type="hidden" id="posItemIdInput">
+                            <input type="text" id="posLabelInput" class="w-full p-2 border rounded text-sm focus:outline-none focus:border-green-500" placeholder="الوصف (مثلاً: إبداع)" required>
+                            <div class="flex gap-2">
+                                <input type="number" id="posValueInput" class="w-20 p-2 border rounded text-sm focus:outline-none focus:border-green-500" value="10" placeholder="النقاط" required>
+                                <button type="submit" id="posSubmitBtn" class="flex-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 shadow font-bold">إضافة</button>
+                            </div>
+                        </form>
+                        <ul id="adminPosList" class="space-y-2 max-h-40 overflow-y-auto custom-scroll pr-1"></ul>
+                    </div>
+
+                    <!-- Negative Items Settings -->
+                    <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-red-500 relative">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-red-700 flex items-center gap-2">
+                                <i data-lucide="settings-2"></i> بنود سلبية
+                            </h3>
+                            <button onclick="resetItemForm('negative')" id="cancelEditNegBtn" class="hidden text-xs text-red-500 hover:underline">إلغاء</button>
+                        </div>
+
+                        <form onsubmit="handleItemForm(event, 'negative')" class="mb-4 space-y-2 bg-red-50 p-3 rounded border border-red-100">
+                            <input type="hidden" id="negItemIdInput">
+                            <input type="text" id="negLabelInput" class="w-full p-2 border rounded text-sm focus:outline-none focus:border-red-500" placeholder="الوصف (مثلاً: غياب)" required>
+                            <div class="flex gap-2">
+                                <input type="number" id="negValueInput" class="w-20 p-2 border rounded text-sm focus:outline-none focus:border-red-500" value="10" placeholder="النقاط" required>
+                                <button type="submit" id="negSubmitBtn" class="flex-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 shadow font-bold">إضافة</button>
+                            </div>
+                        </form>
+                        <ul id="adminNegList" class="space-y-2 max-h-40 overflow-y-auto custom-scroll pr-1"></ul>
+                    </div>
+                </div>
+
+                <div class="text-center pt-4 border-t border-gray-300">
+                    <button onclick="logoutAdmin()" class="text-red-500 hover:text-red-700 font-bold hover:underline flex items-center justify-center gap-2 mx-auto">
+                        <i data-lucide="log-out"></i> تسجيل الخروج
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: DISPLAY DATA (Leaderboard) -->
+        <section id="section-display" class="hidden fade-in">
+            <div class="bg-white rounded-lg shadow-md border-t-4 border-indigo-600 overflow-hidden">
+                <div class="p-6 pb-0 flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        <i data-lucide="trophy" class="text-yellow-500"></i> لوحة الشرف والتميز
+                    </h2>
+                    <div class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
+                        عدد الطلاب: <span id="totalStudentsCount" class="font-bold text-indigo-600">0</span>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right border-collapse">
+                        <thead class="bg-gray-50 text-gray-600 uppercase text-sm leading-normal border-b border-gray-200">
+                            <tr>
+                                <th class="py-4 px-6 text-right w-16">المركز</th>
+                                <th class="py-4 px-6 text-right">اسم الطالب</th>
+                                <th class="py-4 px-6 text-center">الرصيد</th>
+                                <th class="py-4 px-6 text-center">الوسام</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentsTableBody" class="text-gray-700 text-sm font-medium">
+                            <!-- Rows loaded via JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="empty-state" class="hidden p-12 text-center text-gray-400">
+                    <i data-lucide="clipboard-list" size="64" class="mx-auto mb-4 opacity-20"></i>
+                    <p class="text-lg">لا توجد بيانات للعرض حالياً</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- Data Initialization ---
+        const DEFAULT_POS_ITEMS = [
+            { id: 1, label: 'مشاركة فعالة', value: 10 },
+            { id: 2, label: 'حل الواجبات', value: 10 },
+            { id: 3, label: 'نظافة وترتيب', value: 10 },
+            { id: 4, label: 'مساعدة الزملاء', value: 10 }
+        ];
+        const DEFAULT_NEG_ITEMS = [
+            { id: 1, label: 'إزعاج وتشويش', value: 10 },
+            { id: 2, label: 'عدم حل الواجب', value: 10 },
+            { id: 3, label: 'تأخر عن الحصة', value: 10 },
+            { id: 4, label: 'نسيان الأدوات', value: 10 }
+        ];
+
+        let students = JSON.parse(localStorage.getItem('studentsData')) || [];
+        let config = JSON.parse(localStorage.getItem('appConfig')) || {
+            posItems: DEFAULT_POS_ITEMS,
+            negItems: DEFAULT_NEG_ITEMS
+        };
+
+        let isAdminLoggedIn = false;
+        const ADMIN_PASS = "1234";
+
+        // --- Core Functions ---
+
+        function saveData() {
+            localStorage.setItem('studentsData', JSON.stringify(students));
+            localStorage.setItem('appConfig', JSON.stringify(config));
+            renderAll();
+        }
+
+        function switchTab(tabId) {
+            if (tabId === 'admin') {
+                if (!isAdminLoggedIn) {
+                    document.getElementById('admin-login').classList.remove('hidden');
+                    document.getElementById('admin-dashboard').classList.add('hidden');
+                } else {
+                    document.getElementById('admin-login').classList.add('hidden');
+                    document.getElementById('admin-dashboard').classList.remove('hidden');
+                    renderAll(); 
+                }
+            }
+
+            ['admin', 'display'].forEach(t => {
+                const section = document.getElementById(`section-${t}`);
+                const btn = document.getElementById(`tab-${t}`);
+                if (t === tabId) {
+                    section.classList.remove('hidden');
+                    btn.classList.add('active-tab');
+                    btn.classList.remove('inactive-tab');
+                } else {
+                    section.classList.add('hidden');
+                    btn.classList.remove('active-tab');
+                    btn.classList.add('inactive-tab');
+                }
+            });
+
+            if (tabId === 'display') renderDisplayTable();
+        }
+
+        // --- Admin Logic ---
+
+        function checkPassword() {
+            const input = document.getElementById('adminPasswordInput');
+            if (input.value === ADMIN_PASS) {
+                isAdminLoggedIn = true;
+                input.value = '';
+                document.getElementById('admin-login').classList.add('hidden');
+                document.getElementById('admin-dashboard').classList.remove('hidden');
+                renderAll();
+                showToast('تم تسجيل الدخول بنجاح');
+            } else {
+                showToast('كلمة المرور خاطئة', 'error');
+            }
+        }
+
+        function logoutAdmin() {
+            isAdminLoggedIn = false;
+            switchTab('admin');
+            showToast('تم تسجيل الخروج', 'warning');
+        }
+
+        // --- Student Management (CRUD) ---
+
+        function handleStudentForm(e) {
+            e.preventDefault();
+            const idInput = document.getElementById('studentIdInput').value;
+            const nameInput = document.getElementById('studentNameInput');
+            const name = nameInput.value.trim();
+
+            if (!name) return;
+
+            if (idInput) {
+                // UPDATE Mode
+                const index = students.findIndex(s => s.id == idInput);
+                if (index !== -1) {
+                    students[index].name = name;
+                    showToast('تم تحديث بيانات الطالب');
+                }
+            } else {
+                // CREATE Mode
+                students.push({ id: Date.now(), name: name, balance: 0 });
+                showToast('تمت إضافة الطالب');
+            }
+
+            saveData();
+            resetStudentForm();
+        }
+
+        function prepareEditStudent(id) {
+            const student = students.find(s => s.id === id);
+            if (!student) return;
+
+            document.getElementById('studentIdInput').value = student.id;
+            document.getElementById('studentNameInput').value = student.name;
+            
+            const btn = document.getElementById('studentSubmitBtn');
+            btn.innerHTML = '<i data-lucide="refresh-cw"></i> تحديث';
+            btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+            btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+
+            document.getElementById('cancelEditStudentBtn').classList.remove('hidden');
+            document.getElementById('studentNameInput').focus();
+            lucide.createIcons();
+        }
+
+        function deleteStudent(id) {
+            if (confirm('هل أنت متأكد من حذف هذا الطالب؟ سيتم فقدان جميع نقاطه.')) {
+                students = students.filter(s => s.id !== id);
+                saveData();
+                resetStudentForm(); // In case we were editing the deleted one
+                showToast('تم حذف الطالب', 'warning');
+            }
+        }
+
+        function resetStudentForm() {
+            document.getElementById('studentIdInput').value = '';
+            document.getElementById('studentNameInput').value = '';
+            
+            const btn = document.getElementById('studentSubmitBtn');
+            btn.innerHTML = '<i data-lucide="plus"></i> إضافة';
+            btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+
+            document.getElementById('cancelEditStudentBtn').classList.add('hidden');
+            lucide.createIcons();
+        }
+
+        // --- Items Management (CRUD) ---
+
+        function handleItemForm(e, type) {
+            e.preventDefault();
+            const idInput = document.getElementById(type === 'positive' ? 'posItemIdInput' : 'negItemIdInput').value;
+            const labelInput = document.getElementById(type === 'positive' ? 'posLabelInput' : 'negLabelInput');
+            const valueInput = document.getElementById(type === 'positive' ? 'posValueInput' : 'negValueInput');
+            
+            const label = labelInput.value.trim();
+            const value = Math.abs(parseInt(valueInput.value)) || 10;
+            const list = type === 'positive' ? config.posItems : config.negItems;
+
+            if (!label) return;
+
+            if (idInput) {
+                // UPDATE Item
+                const index = list.findIndex(i => i.id == idInput);
+                if (index !== -1) {
+                    list[index].label = label;
+                    list[index].value = value;
+                    showToast('تم تحديث البند');
+                }
+            } else {
+                // CREATE Item
+                list.push({ id: Date.now(), label, value });
+                showToast('تمت إضافة البند');
+            }
+
+            saveData();
+            resetItemForm(type);
+        }
+
+        function prepareEditItem(id, type) {
+            const list = type === 'positive' ? config.posItems : config.negItems;
+            const item = list.find(i => i.id === id);
+            if (!item) return;
+
+            const prefix = type === 'positive' ? 'pos' : 'neg';
+            const btnClassRemove = type === 'positive' ? 'bg-green-600' : 'bg-red-600';
+            const btnClassAdd = 'bg-indigo-600';
+
+            document.getElementById(`${prefix}ItemIdInput`).value = item.id;
+            document.getElementById(`${prefix}LabelInput`).value = item.label;
+            document.getElementById(`${prefix}ValueInput`).value = item.value;
+
+            const btn = document.getElementById(`${prefix}SubmitBtn`);
+            btn.textContent = 'تحديث';
+            btn.classList.remove(btnClassRemove);
+            btn.classList.add(btnClassAdd);
+
+            document.getElementById(`cancelEdit${type === 'positive' ? 'Pos' : 'Neg'}Btn`).classList.remove('hidden');
+        }
+
+        function deleteItem(id, type) {
+            if (confirm('حذف هذا البند؟')) {
+                if (type === 'positive') config.posItems = config.posItems.filter(i => i.id !== id);
+                else config.negItems = config.negItems.filter(i => i.id !== id);
+                saveData();
+                resetItemForm(type);
+            }
+        }
+
+        function resetItemForm(type) {
+            const prefix = type === 'positive' ? 'pos' : 'neg';
+            document.getElementById(`${prefix}ItemIdInput`).value = '';
+            document.getElementById(`${prefix}LabelInput`).value = '';
+            document.getElementById(`${prefix}ValueInput`).value = '10';
+
+            const btn = document.getElementById(`${prefix}SubmitBtn`);
+            btn.textContent = 'إضافة';
+            btn.classList.remove('bg-indigo-600');
+            btn.classList.add(type === 'positive' ? 'bg-green-600' : 'bg-red-600');
+
+            document.getElementById(`cancelEdit${type === 'positive' ? 'Pos' : 'Neg'}Btn`).classList.add('hidden');
+        }
+
+        // --- Points Application ---
+
+        function applyPoints() {
+            const studentId = document.getElementById('pointsStudentSelect').value;
+            const checkedBoxes = document.querySelectorAll('input[name="pointItem"]:checked');
+
+            if (!studentId) return showToast('الرجاء اختيار الطالب أولاً', 'error');
+            if (checkedBoxes.length === 0) return showToast('الرجاء اختيار بند واحد على الأقل', 'error');
+
+            let totalChange = 0;
+            checkedBoxes.forEach(box => {
+                totalChange += parseInt(box.value);
+                box.checked = false; 
+            });
+
+            const student = students.find(s => s.id == studentId);
+            if (student) {
+                student.balance += totalChange;
+                saveData();
+                const msgType = totalChange >= 0 ? 'success' : 'warning';
+                showToast(`تم تحديث الرصيد للطالب: ${student.name} (${totalChange > 0 ? '+' : ''}${totalChange})`, msgType);
+            }
+        }
+
+        // --- Rendering ---
+
+        function renderAll() {
+            if (!isAdminLoggedIn) return;
+
+            // 1. Points - Student Select
+            const select = document.getElementById('pointsStudentSelect');
+            const savedVal = select.value;
+            select.innerHTML = '<option value="">-- اختر طالباً --</option>';
+            students.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.text = `${s.name} (الرصيد: ${s.balance})`;
+                select.add(opt);
+            });
+            select.value = savedVal;
+
+            // 2. Points - Checkboxes
+            const renderCheckbox = (item, type) => {
+                const isPos = type === 'positive';
+                const sign = isPos ? '+' : '-';
+                const colorClass = isPos ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100';
+                const val = isPos ? item.value : -item.value;
+                return `
+                <label class="flex items-center p-3 bg-white rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-50 select-none transition">
+                    <input type="checkbox" name="pointItem" value="${val}">
+                    <span class="mr-3 text-gray-700 text-sm font-semibold flex-1">${item.label}</span>
+                    <span class="text-xs ${colorClass} font-bold px-2 py-1 rounded-full">${sign}${item.value}</span>
+                </label>`;
+            };
+            document.getElementById('pointsPosContainer').innerHTML = config.posItems.map(i => renderCheckbox(i, 'positive')).join('');
+            document.getElementById('pointsNegContainer').innerHTML = config.negItems.map(i => renderCheckbox(i, 'negative')).join('');
+
+            // 3. Admin Students List
+            document.getElementById('adminStudentsList').innerHTML = students.map(s => `
+                <tr class="hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                    <td class="p-3 text-gray-800 font-medium">${s.name}</td>
+                    <td class="p-3 text-center flex justify-center gap-2">
+                        <button onclick="prepareEditStudent(${s.id})" class="text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 p-2 rounded transition" title="تعديل">
+                            <i data-lucide="edit-2" size="18"></i>
+                        </button>
+                        <button onclick="deleteStudent(${s.id})" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded transition" title="حذف">
+                            <i data-lucide="trash-2" size="18"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            // 4. Admin Items Lists
+            const renderAdminItem = (i, type) => `
+                <li class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200 group hover:bg-white hover:shadow-sm transition">
+                    <span class="text-sm font-semibold text-gray-700">${i.label} (${i.value})</span>
+                    <div class="flex gap-2">
+                        <button onclick="prepareEditItem(${i.id}, '${type}')" class="text-blue-400 hover:text-blue-600 transition"><i data-lucide="edit-3" size="16"></i></button>
+                        <button onclick="deleteItem(${i.id}, '${type}')" class="text-red-400 hover:text-red-600 transition"><i data-lucide="trash" size="16"></i></button>
+                    </div>
+                </li>
+            `;
+            document.getElementById('adminPosList').innerHTML = config.posItems.map(i => renderAdminItem(i, 'positive')).join('');
+            document.getElementById('adminNegList').innerHTML = config.negItems.map(i => renderAdminItem(i, 'negative')).join('');
+
+            lucide.createIcons();
+        }
+
+        function renderDisplayTable() {
+            const tbody = document.getElementById('studentsTableBody');
+            const countSpan = document.getElementById('totalStudentsCount');
+            const emptyState = document.getElementById('empty-state');
+            
+            countSpan.textContent = students.length;
+            tbody.innerHTML = '';
+
+            if (students.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                const sorted = [...students].sort((a, b) => b.balance - a.balance);
+                
+                sorted.forEach((s, i) => {
+                    let rank = i + 1;
+                    let rowClass = "border-b border-gray-100 hover:bg-gray-50 transition";
+                    let balanceClass = "text-gray-700";
+                    let badge = "";
+
+                    if (s.balance > 0) {
+                        balanceClass = "text-green-600 font-bold";
+                        badge = '<span class="inline-block bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">متميز</span>';
+                    } else if (s.balance < 0) {
+                        balanceClass = "text-red-600 font-bold";
+                        badge = '<span class="inline-block bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full">تنبيه</span>';
+                    }
+
+                    let rankDisplay = `<span class="font-bold text-gray-500">#${rank}</span>`;
+                    if (i === 0 && s.balance > 0) { rankDisplay = '<span class="text-2xl">🥇</span>'; rowClass += " bg-yellow-50"; }
+                    if (i === 1 && s.balance > 0) rankDisplay = '<span class="text-2xl">🥈</span>';
+                    if (i === 2 && s.balance > 0) rankDisplay = '<span class="text-2xl">🥉</span>';
+                    
+                    const tr = document.createElement('tr');
+                    tr.className = rowClass;
+                    tr.innerHTML = `
+                        <td class="py-4 px-6 text-right">${rankDisplay}</td>
+                        <td class="py-4 px-6 text-right font-semibold text-gray-800 text-lg">${s.name}</td>
+                        <td class="py-4 px-6 text-center text-xl ${balanceClass}" dir="ltr">${s.balance}</td>
+                        <td class="py-4 px-6 text-center text-lg">${badge}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            const txt = document.getElementById('toast-message');
+            txt.textContent = msg;
+            toast.className = `fixed top-4 left-4 text-white px-6 py-3 rounded-lg shadow-lg transform transition-transform duration-300 z-50 flex items-center gap-2 ${type === 'success' ? 'bg-green-600' : (type === 'error' ? 'bg-red-600' : 'bg-yellow-600')}`;
+            setTimeout(() => toast.classList.remove('-translate-y-20'), 100);
+            setTimeout(() => toast.classList.add('-translate-y-20'), 3000);
+        }
+
+        // Init
+        lucide.createIcons();
+        switchTab('admin');
+    </script>
+</body>
+</html>
+
+
