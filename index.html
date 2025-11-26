@@ -37,7 +37,7 @@
 
     <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
         // --- إعدادات فايربيس الخاصة بك ---
@@ -56,11 +56,13 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        // اسم المجموعة في قاعدة البيانات
+        // أسماء المجموعات في قاعدة البيانات
         const COLLECTION_NAME = "my_links_tree"; 
+        const SETTINGS_COLLECTION = "app_settings"; // مجموعة لحفظ إعدادات المدير
+        const AUTH_DOC_ID = "auth_config"; // اسم مستند إعدادات الدخول
 
         const { useState, useEffect } = React;
-        const { Search, Link: LinkIcon, ExternalLink, Copy, Share2, Settings, Plus, Trash2, Edit2, Check, X, Save, LogOut, Loader2, Smartphone, Mail, Globe } = lucide;
+        const { Search, Link: LinkIcon, ExternalLink, Copy, Share2, Settings, Plus, Trash2, Edit2, Check, X, Save, LogOut, Loader2, Smartphone, Mail, Globe, UserCog, Key } = lucide;
 
         const App = () => {
             const [links, setLinks] = useState([]);
@@ -71,6 +73,11 @@
             const [isAdmin, setIsAdmin] = useState(false);
             const [showLoginModal, setShowLoginModal] = useState(false);
             const [showEditorModal, setShowEditorModal] = useState(false);
+            const [showSettingsModal, setShowSettingsModal] = useState(false);
+            
+            // Admin Credentials State (from DB)
+            const [adminCreds, setAdminCreds] = useState({ username: "admin", password: "123456" });
+            const [newCreds, setNewCreds] = useState({ username: "", password: "" });
             
             // Editor Data
             const [currentLink, setCurrentLink] = useState(null);
@@ -79,36 +86,45 @@
             // Toast
             const [toast, setToast] = useState({ show: false, message: "", type: "success" });
 
-            // Hardcoded Admin Credentials for UI Lock (Security depends on Firebase Rules mostly)
-            const ADMIN_USER = "admin";
-            const ADMIN_PASS = "123456";
-
             // 1. الاتصال بقاعدة البيانات عند التحميل
             useEffect(() => {
                 // تسجيل دخول مجهول لقراءة البيانات (مهم لفايربيس)
                 signInAnonymously(auth).catch(err => console.error("Auth Error:", err));
 
+                // جلب الروابط
                 const q = query(collection(db, COLLECTION_NAME), orderBy("created_at", "desc"));
-                const unsubscribe = onSnapshot(q, (snapshot) => {
+                const unsubscribeLinks = onSnapshot(q, (snapshot) => {
                     const linksData = snapshot.docs.map(doc => ({
                         id: doc.id,
                         ...doc.data()
                     }));
                     setLinks(linksData);
                     setLoading(false);
-                    // Refresh Icons
                     setTimeout(() => lucide.createIcons(), 100);
                 }, (error) => {
                     console.error("Error fetching links:", error);
                     setLoading(false);
                 });
 
-                return () => unsubscribe();
+                // جلب إعدادات الدخول (اسم المستخدم وكلمة المرور)
+                const unsubscribeSettings = onSnapshot(doc(db, SETTINGS_COLLECTION, AUTH_DOC_ID), (docSnap) => {
+                    if (docSnap.exists()) {
+                        setAdminCreds(docSnap.data());
+                    } else {
+                        // إذا لم يوجد مستند، نستخدم الافتراضي
+                        console.log("Using default credentials");
+                    }
+                });
+
+                return () => {
+                    unsubscribeLinks();
+                    unsubscribeSettings();
+                };
             }, []);
 
             useEffect(() => {
                 lucide.createIcons();
-            }, [links, isAdmin, showLoginModal, showEditorModal]);
+            }, [links, isAdmin, showLoginModal, showEditorModal, showSettingsModal]);
 
             // --- دوال المساعدة ---
             const showToast = (msg, type = "success") => {
@@ -118,20 +134,55 @@
 
             const handleLogin = (e) => {
                 e.preventDefault();
-                if (e.target.username.value === ADMIN_USER && e.target.password.value === ADMIN_PASS) {
+                // التحقق باستخدام البيانات القادمة من قاعدة البيانات
+                if (e.target.username.value === adminCreds.username && e.target.password.value === adminCreds.password) {
                     setIsAdmin(true);
                     setShowLoginModal(false);
                     showToast("أهلاً بك أيها المدير");
                 } else {
-                    showToast("بيانات خطأ", "error");
+                    showToast("بيانات الدخول غير صحيحة", "error");
+                }
+            };
+
+            // دالة تحديث بيانات الدخول
+            const handleUpdateCreds = async (e) => {
+                e.preventDefault();
+                if (!newCreds.username || !newCreds.password) {
+                    showToast("الرجاء ملء جميع الحقول", "error");
+                    return;
+                }
+                
+                try {
+                    await setDoc(doc(db, SETTINGS_COLLECTION, AUTH_DOC_ID), {
+                        username: newCreds.username,
+                        password: newCreds.password
+                    });
+                    showToast("تم تحديث بيانات الدخول بنجاح! تذكرها جيداً.");
+                    setShowSettingsModal(false);
+                    // تصفير الحقول
+                    setNewCreds({ username: "", password: "" });
+                } catch (error) {
+                    console.error("Error updating creds:", error);
+                    showToast("حدث خطأ أثناء التحديث", "error");
+                }
+            };
+
+            // دالة للحصول على الرابط الكامل
+            const getFullUrl = (url) => {
+                try {
+                    // يحول الرابط النسبي إلى رابط كامل بناءً على دومين الموقع الحالي
+                    return new URL(url, window.location.href).href;
+                } catch (e) {
+                    return url;
                 }
             };
 
             const handleShare = async (link) => {
+                const fullUrl = getFullUrl(link.url);
                 const shareData = {
                     title: link.title,
                     text: link.desc,
-                    url: link.url
+                    url: fullUrl
                 };
 
                 // محاولة استخدام ميزة المشاركة الأصلية في الجوال
@@ -144,13 +195,14 @@
                     }
                 } else {
                     // إذا كان كمبيوتر: نسخ الرابط وفتح الواتساب ويب كمثال
-                    navigator.clipboard.writeText(link.url);
-                    showToast("تم نسخ الرابط! (المتصفح لا يدعم المشاركة المباشرة)");
+                    navigator.clipboard.writeText(fullUrl);
+                    showToast("تم نسخ الرابط الكامل!");
                 }
             };
 
-            const copyToClipboard = (text) => {
-                navigator.clipboard.writeText(text).then(() => showToast("تم نسخ الرابط بنجاح!"));
+            const copyToClipboard = (url) => {
+                const fullUrl = getFullUrl(url);
+                navigator.clipboard.writeText(fullUrl).then(() => showToast("تم نسخ الرابط الكامل بنجاح!"));
             };
 
             // --- عمليات قاعدة البيانات (CRUD) ---
@@ -244,13 +296,16 @@
                             <div className="mb-8 p-4 glass-card rounded-2xl flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-blue-500 animate-fade-in">
                                 <div className="flex items-center gap-2 text-blue-400">
                                     <i data-lucide="settings" className="w-5 h-5"></i>
-                                    <span className="font-bold">لوحة التحكم (متصل بقاعدة البيانات)</span>
+                                    <span className="font-bold">لوحة التحكم (متصل)</span>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 flex-wrap justify-center">
                                     <button onClick={() => openEditor()} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition-colors text-sm font-medium shadow-lg shadow-blue-600/20">
-                                        <i data-lucide="plus" className="w-4 h-4"></i> إضافة رابط جديد
+                                        <i data-lucide="plus" className="w-4 h-4"></i> إضافة رابط
                                     </button>
-                                    <button onClick={() => setIsAdmin(false)} className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-xl transition-colors text-sm font-medium">
+                                    <button onClick={() => { setNewCreds(adminCreds); setShowSettingsModal(true); }} className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl transition-colors text-sm font-medium border border-slate-600">
+                                        <i data-lucide="user-cog" className="w-4 h-4"></i> بيانات الدخول
+                                    </button>
+                                    <button onClick={() => setIsAdmin(false)} className="flex items-center gap-2 bg-red-900/50 hover:bg-red-900 text-red-200 px-4 py-2 rounded-xl transition-colors text-sm font-medium">
                                         <i data-lucide="log-out" className="w-4 h-4"></i> خروج
                                     </button>
                                 </div>
@@ -272,10 +327,10 @@
                                                     <i data-lucide="link" className="w-6 h-6"></i>
                                                 </div>
                                                 <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg backdrop-blur-md">
-                                                    <button onClick={() => copyToClipboard(link.url)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors relative" title="نسخ">
+                                                    <button onClick={() => copyToClipboard(link.url)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors relative" title="نسخ الرابط بالكامل">
                                                         <i data-lucide="copy" className="w-4 h-4"></i>
                                                     </button>
-                                                    <button onClick={() => handleShare(link)} className="p-2 text-green-400 hover:text-white hover:bg-green-600 rounded-lg transition-colors" title="مشاركة عبر واتساب/إيميل">
+                                                    <button onClick={() => handleShare(link)} className="p-2 text-green-400 hover:text-white hover:bg-green-600 rounded-lg transition-colors" title="مشاركة">
                                                         <i data-lucide="share-2" className="w-4 h-4"></i>
                                                     </button>
                                                     <a href={link.url} target="_blank" className="p-2 text-blue-400 hover:text-white hover:bg-blue-600 rounded-lg transition-colors" title="فتح">
@@ -334,7 +389,7 @@
                                 </button>
                                 <div className="text-center mb-6">
                                     <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
-                                        <i data-lucide="settings" className="text-blue-500"></i>
+                                        <i data-lucide="key" className="text-blue-500"></i>
                                     </div>
                                     <h2 className="text-xl font-bold text-white">منطقة الإدارة</h2>
                                 </div>
@@ -343,6 +398,49 @@
                                     <input name="password" type="password" className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" placeholder="كلمة المرور" required />
                                     <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/20">
                                         تسجيل الدخول
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* مودال تغيير إعدادات الدخول */}
+                    {showSettingsModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+                            <div className="glass-card w-full max-w-sm p-6 rounded-2xl shadow-2xl relative border-slate-700">
+                                <button onClick={() => setShowSettingsModal(false)} className="absolute left-4 top-4 text-slate-400 hover:text-white">
+                                    <i data-lucide="x" className="w-5 h-5"></i>
+                                </button>
+                                <div className="text-center mb-6">
+                                    <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <i data-lucide="user-cog" className="text-emerald-500"></i>
+                                    </div>
+                                    <h2 className="text-xl font-bold text-white">تحديث بيانات الدخول</h2>
+                                    <p className="text-xs text-slate-400 mt-2">سيتم تحديث البيانات في قاعدة البيانات فوراً</p>
+                                </div>
+                                <form onSubmit={handleUpdateCreds} className="space-y-4">
+                                    <div>
+                                        <label className="text-xs text-slate-400 mb-1 block">اسم المستخدم الجديد</label>
+                                        <input 
+                                            type="text" 
+                                            value={newCreds.username}
+                                            onChange={(e) => setNewCreds({...newCreds, username: e.target.value})}
+                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
+                                            required 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-slate-400 mb-1 block">كلمة المرور الجديدة</label>
+                                        <input 
+                                            type="text" 
+                                            value={newCreds.password}
+                                            onChange={(e) => setNewCreds({...newCreds, password: e.target.value})}
+                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
+                                            required 
+                                        />
+                                    </div>
+                                    <button type="submit" className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-emerald-600/20">
+                                        حفظ البيانات الجديدة
                                     </button>
                                 </form>
                             </div>
@@ -390,8 +488,9 @@
                                                 type="text" 
                                                 dir="ltr"
                                                 className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" 
-                                                placeholder="https://..." required 
+                                                placeholder="page.html" required 
                                             />
+                                            <p className="text-[10px] text-slate-500 mt-1">سيتم تحويله لرابط كامل عند النسخ</p>
                                         </div>
                                         <div>
                                             <label className="text-xs text-slate-400 mb-1 block">التصنيف</label>
