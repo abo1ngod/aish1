@@ -58,8 +58,8 @@
         
         // أسماء المجموعات في قاعدة البيانات
         const COLLECTION_NAME = "my_links_tree"; 
-        const SETTINGS_COLLECTION = "app_settings"; // مجموعة لحفظ إعدادات المدير
-        const AUTH_DOC_ID = "auth_config"; // اسم مستند إعدادات الدخول
+        const SETTINGS_COLLECTION = "app_settings"; 
+        const AUTH_DOC_ID = "auth_config";
 
         const { useState, useEffect } = React;
         const { Search, Link: LinkIcon, ExternalLink, Copy, Share2, Settings, Plus, Trash2, Edit2, Check, X, Save, LogOut, Loader2, Smartphone, Mail, Globe, UserCog, Key } = lucide;
@@ -75,7 +75,7 @@
             const [showEditorModal, setShowEditorModal] = useState(false);
             const [showSettingsModal, setShowSettingsModal] = useState(false);
             
-            // Admin Credentials State (from DB)
+            // Admin Credentials State
             const [adminCreds, setAdminCreds] = useState({ username: "admin", password: "123456" });
             const [newCreds, setNewCreds] = useState({ username: "", password: "" });
             
@@ -88,10 +88,8 @@
 
             // 1. الاتصال بقاعدة البيانات عند التحميل
             useEffect(() => {
-                // تسجيل دخول مجهول لقراءة البيانات (مهم لفايربيس)
                 signInAnonymously(auth).catch(err => console.error("Auth Error:", err));
 
-                // جلب الروابط
                 const q = query(collection(db, COLLECTION_NAME), orderBy("created_at", "desc"));
                 const unsubscribeLinks = onSnapshot(q, (snapshot) => {
                     const linksData = snapshot.docs.map(doc => ({
@@ -106,13 +104,9 @@
                     setLoading(false);
                 });
 
-                // جلب إعدادات الدخول (اسم المستخدم وكلمة المرور)
                 const unsubscribeSettings = onSnapshot(doc(db, SETTINGS_COLLECTION, AUTH_DOC_ID), (docSnap) => {
                     if (docSnap.exists()) {
                         setAdminCreds(docSnap.data());
-                    } else {
-                        // إذا لم يوجد مستند، نستخدم الافتراضي
-                        console.log("Using default credentials");
                     }
                 });
 
@@ -134,7 +128,6 @@
 
             const handleLogin = (e) => {
                 e.preventDefault();
-                // التحقق باستخدام البيانات القادمة من قاعدة البيانات
                 if (e.target.username.value === adminCreds.username && e.target.password.value === adminCreds.password) {
                     setIsAdmin(true);
                     setShowLoginModal(false);
@@ -144,7 +137,6 @@
                 }
             };
 
-            // دالة تحديث بيانات الدخول
             const handleUpdateCreds = async (e) => {
                 e.preventDefault();
                 if (!newCreds.username || !newCreds.password) {
@@ -157,9 +149,8 @@
                         username: newCreds.username,
                         password: newCreds.password
                     });
-                    showToast("تم تحديث بيانات الدخول بنجاح! تذكرها جيداً.");
+                    showToast("تم تحديث بيانات الدخول بنجاح!");
                     setShowSettingsModal(false);
-                    // تصفير الحقول
                     setNewCreds({ username: "", password: "" });
                 } catch (error) {
                     console.error("Error updating creds:", error);
@@ -170,7 +161,6 @@
             // دالة للحصول على الرابط الكامل
             const getFullUrl = (url) => {
                 try {
-                    // يحول الرابط النسبي إلى رابط كامل بناءً على دومين الموقع الحالي
                     return new URL(url, window.location.href).href;
                 } catch (e) {
                     return url;
@@ -196,7 +186,7 @@
                 } else {
                     // إذا كان كمبيوتر: نسخ الرابط وفتح الواتساب ويب كمثال
                     navigator.clipboard.writeText(fullUrl);
-                    showToast("تم نسخ الرابط الكامل!");
+                    showToast("تم نسخ الرابط الكامل للمشاركة!");
                 }
             };
 
@@ -216,12 +206,10 @@
                     };
 
                     if (currentLink) {
-                        // تحديث
                         const docRef = doc(db, COLLECTION_NAME, currentLink.id);
                         await updateDoc(docRef, dataToSave);
                         showToast("تم التحديث بنجاح");
                     } else {
-                        // إضافة جديد
                         await addDoc(collection(db, COLLECTION_NAME), dataToSave);
                         showToast("تمت الإضافة بنجاح");
                     }
@@ -250,7 +238,6 @@
                 setShowEditorModal(true);
             };
 
-            // تصفية النتائج
             const filteredLinks = links.filter(link => 
                 link.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
                 link.desc.toLowerCase().includes(searchTerm.toLowerCase())
@@ -258,13 +245,10 @@
 
             return (
                 <div className="min-h-screen pb-12 relative overflow-hidden">
-                    {/* خلفية جمالية */}
                     <div className="absolute top-0 left-0 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none"></div>
                     <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 z-0 pointer-events-none"></div>
 
                     <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6">
-                        
-                        {/* الهيدر */}
                         <header className="py-12 text-center animate-fade-in">
                             <div className="w-24 h-24 mx-auto bg-gradient-to-tr from-blue-500 to-purple-600 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-blue-500/20 ring-4 ring-slate-800">
                                 <i data-lucide="globe" className="text-white w-10 h-10"></i>
@@ -276,7 +260,6 @@
                                 بوابتك الشاملة لجميع مشاريعي، خدماتي، وروابطي الهامة. يتم تحديث القائمة تلقائياً.
                             </p>
                             
-                            {/* البحث */}
                             <div className="mt-8 relative max-w-md mx-auto group">
                                 <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
                                     <i data-lucide="search" className="text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors"></i>
@@ -291,7 +274,6 @@
                             </div>
                         </header>
 
-                        {/* أدوات المدير */}
                         {isAdmin && (
                             <div className="mb-8 p-4 glass-card rounded-2xl flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-blue-500 animate-fade-in">
                                 <div className="flex items-center gap-2 text-blue-400">
@@ -312,7 +294,6 @@
                             </div>
                         )}
 
-                        {/* شبكة الروابط */}
                         {loading ? (
                             <div className="flex justify-center py-20">
                                 <div className="loader"></div>
@@ -330,7 +311,7 @@
                                                     <button onClick={() => copyToClipboard(link.url)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors relative" title="نسخ الرابط بالكامل">
                                                         <i data-lucide="copy" className="w-4 h-4"></i>
                                                     </button>
-                                                    <button onClick={() => handleShare(link)} className="p-2 text-green-400 hover:text-white hover:bg-green-600 rounded-lg transition-colors" title="مشاركة">
+                                                    <button onClick={() => handleShare(link)} className="p-2 text-green-400 hover:text-white hover:bg-green-600 rounded-lg transition-colors" title="مشاركة (واتساب/إيميل)">
                                                         <i data-lucide="share-2" className="w-4 h-4"></i>
                                                     </button>
                                                     <a href={link.url} target="_blank" className="p-2 text-blue-400 hover:text-white hover:bg-blue-600 rounded-lg transition-colors" title="فتح">
@@ -339,7 +320,10 @@
                                                 </div>
                                             </div>
                                             
-                                            <h3 className="text-xl font-bold text-white mb-1 group-hover:text-blue-400 transition-colors">{link.title}</h3>
+                                            {/* تم التعديل هنا: إضافة تاج الرابط حول العنوان ليفتح في نافذة جديدة */}
+                                            <a href={link.url} target="_blank" rel="noopener noreferrer" className="block">
+                                                <h3 className="text-xl font-bold text-white mb-1 group-hover:text-blue-400 transition-colors cursor-pointer">{link.title}</h3>
+                                            </a>
                                             <p className="text-slate-400 text-sm mb-4 line-clamp-2 leading-relaxed">{link.desc}</p>
                                             
                                             <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-700/50">
@@ -369,7 +353,6 @@
                             </div>
                         )}
 
-                        {/* تذييل */}
                         <footer className="mt-16 text-center text-slate-500 pb-8 text-sm">
                             <p className="mb-4">&copy; {new Date().getFullYear()} جميع الحقوق محفوظة.</p>
                             {!isAdmin && (
@@ -380,7 +363,6 @@
                         </footer>
                     </div>
 
-                    {/* مودال تسجيل الدخول */}
                     {showLoginModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
                             <div className="glass-card w-full max-w-sm p-6 rounded-2xl shadow-2xl relative border-slate-700">
@@ -404,7 +386,6 @@
                         </div>
                     )}
 
-                    {/* مودال تغيير إعدادات الدخول */}
                     {showSettingsModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
                             <div className="glass-card w-full max-w-sm p-6 rounded-2xl shadow-2xl relative border-slate-700">
@@ -447,7 +428,6 @@
                         </div>
                     )}
 
-                    {/* مودال المحرر (الإضافة والتعديل) */}
                     {showEditorModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
                             <div className="glass-card w-full max-w-lg p-6 rounded-2xl shadow-2xl relative border-slate-700">
@@ -514,7 +494,6 @@
                         </div>
                     )}
 
-                    {/* التنبيهات (Toast) */}
                     {toast.show && (
                         <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-50 animate-fade-in ${toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-600'} text-white`}>
                             {toast.type === 'error' ? <i data-lucide="x" className="w-5 h-5"></i> : <i data-lucide="check" className="w-5 h-5"></i>}
