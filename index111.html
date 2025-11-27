@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام الطلاب المركزي</title>
+    
+    <!-- 1. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- 3. مكتبات Firebase (النسخة المتوافقة - Compat) -->
+    <!-- هذه النسخة تعمل مباشرة في المتصفح بدون مشاكل Modules -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Cairo', sans-serif; background-color: #f0f9ff; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* لإظهار الأخطاء إن وجدت */
+        #error-log { display: none; background: #fee2e2; color: #991b1b; padding: 20px; margin: 20px; border-radius: 8px; border: 1px solid #ef4444; direction: ltr; text-align: left; }
+    </style>
+</head>
+<body>
+    <!-- مكان لظهار الأخطاء في حال فشل التشغيل -->
+    <div id="error-log"></div>
+    
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- 1. إعداد Firebase (هام جداً: استبدل البيانات هنا) ---
+    
+    const firebaseConfig = {
+  apiKey: "AIzaSyBxPO6RKsQ1Cq-mqlCpFTrCuIyxnYdB37U",
+  authDomain: "studentsystem-c1ab1.firebaseapp.com",
+  databaseURL: "https://studentsystem-c1ab1-default-rtdb.firebaseio.com",
+  projectId: "studentsystem-c1ab1",
+  storageBucket: "studentsystem-c1ab1.firebasestorage.app",
+  messagingSenderId: "112215023848",
+  appId: "1:112215023848:web:0adba326a527ee7e37e95d"
+};
+
+        // تهيئة التطبيق بالطريقة الكلاسيكية
+        let db;
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.firestore();
+            console.log("Firebase Connected Successfully");
+        } catch (error) {
+            console.error("Firebase Error:", error);
+            document.getElementById('error-log').style.display = 'block';
+            document.getElementById('error-log').innerHTML = `<strong>Firebase Error:</strong> ${error.message}<br>تأكد من وضع بيانات Config الصحيحة في الكود.`;
+        }
+
+        const { useState, useEffect } = React;
+
+        // دالة ضغط الصور
+        const resizeImage = (file) => {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const MAX_WIDTH = 500; // تقليل الحجم للتخزين السريع
+                        const scaleSize = MAX_WIDTH / img.width;
+                        canvas.width = MAX_WIDTH;
+                        canvas.height = img.height * scaleSize;
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.6));
+                    }
+                    img.src = event.target.result;
+                }
+                reader.readAsDataURL(file);
+            });
+        };
+
+        const App = () => {
+            const [view, setView] = useState('home'); 
+            const [loading, setLoading] = useState(false);
+            const [students, setStudents] = useState([]);
+            const [form, setForm] = useState({ name: '', nid: '', phone: '' });
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [pass, setPass] = useState('');
+
+            // --- جلب البيانات (Realtime) ---
+            useEffect(() => {
+                if(!db) return;
+                
+                // استخدام صيغة Compat (v8 syntax)
+                const unsubscribe = db.collection("students")
+                    .orderBy("createdAt", "desc")
+                    .onSnapshot((snapshot) => {
+                        const data = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        setStudents(data);
+                    }, (error) => {
+                        console.error("Data Fetch Error:", error);
+                        alert("خطأ في جلب البيانات: تأكد من صلاحيات قاعدة البيانات (Rules).");
+                    });
+
+                return () => unsubscribe();
+            }, []);
+
+            // --- إضافة طالب ---
+            const handleAdd = async (e) => {
+                e.preventDefault();
+                if(!db) return alert("خطأ: قاعدة البيانات غير متصلة");
+                
+                setLoading(true);
+                try {
+                    const photoFile = document.getElementById('photoInput').files[0];
+                    const docFile = document.getElementById('docInput').files[0];
+                    
+                    let photoBase64 = null;
+                    let docBase64 = null;
+
+                    if (photoFile) photoBase64 = await resizeImage(photoFile);
+                    if (docFile) docBase64 = await resizeImage(docFile);
+
+                    // الإضافة باستخدام صيغة Compat
+                    await db.collection("students").add({
+                        ...form,
+                        photo: photoBase64,
+                        document: docBase64,
+                        createdAt: new Date().toISOString()
+                    });
+                    
+                    alert("تم الحفظ بنجاح!");
+                    setForm({ name: '', nid: '', phone: '' });
+                    document.getElementById('photoInput').value = "";
+                    document.getElementById('docInput').value = "";
+                } catch (err) {
+                    console.error(err);
+                    alert("فشل الحفظ: " + err.message);
+                }
+                setLoading(false);
+            };
+
+            // --- حذف طالب ---
+            const handleDelete = async (id) => {
+                if(!confirm("حذف نهائي؟")) return;
+                try {
+                    await db.collection("students").doc(id).delete();
+                } catch (err) {
+                    alert("خطأ في الحذف");
+                }
+            };
+
+            // --- الواجهات ---
+            const Navbar = () => (
+                <nav className="bg-blue-800 text-white p-4 shadow-lg sticky top-0 z-50">
+                    <div className="max-w-6xl mx-auto flex justify-between items-center">
+                        <h1 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                             منصة الطلاب
+                        </h1>
+                        <div className="flex gap-2 text-sm">
+                            <button onClick={()=>setView('home')} className={`px-3 py-1 rounded ${view==='home'?'bg-white text-blue-800':'hover:bg-blue-700'}`}>تسجيل</button>
+                            <button onClick={()=>setView('list')} className={`px-3 py-1 rounded ${view==='list'?'bg-white text-blue-800':'hover:bg-blue-700'}`}>القوائم</button>
+                            <button onClick={()=>setView('admin')} className={`px-3 py-1 rounded ${view==='admin'?'bg-white text-blue-800':'hover:bg-blue-700'}`}>إدارة</button>
+                        </div>
+                    </div>
+                </nav>
+            );
+
+            // واجهة تسجيل دخول المدير
+            if (view === 'admin' && !isAdmin) {
+                return (
+                    <div className="min-h-screen bg-gray-50 font-[Cairo]">
+                        <Navbar />
+                        <div className="flex justify-center items-center h-[60vh] px-4">
+                            <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-sm text-center">
+                                <h2 className="font-bold text-xl mb-6 text-gray-700">دخول المدير</h2>
+                                <input type="password" placeholder="الرمز السري (1234)" className="border p-3 rounded w-full mb-4 text-center text-lg outline-none focus:border-blue-500" value={pass} onChange={(e)=>setPass(e.target.value)} />
+                                <button onClick={()=>{ if(pass==='1234') setIsAdmin(true); else alert('الرمز خطأ'); }} className="bg-blue-600 text-white px-6 py-2 rounded w-full font-bold hover:bg-blue-700">دخول</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen pb-10 font-[Cairo]">
+                    <Navbar />
+                    
+                    <div className="max-w-4xl mx-auto mt-8 px-4">
+                        {loading && <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"><div className="loader"></div></div>}
+
+                        {/* التسجيل */}
+                        {view === 'home' && (
+                            <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-blue-600">
+                                <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                                    تسجيل طالب جديد
+                                </h2>
+                                <form onSubmit={handleAdd} className="space-y-4">
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-600 mb-1">الاسم الكامل</label>
+                                            <input required className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} placeholder="الاسم الرباعي" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-600 mb-1">رقم الهوية</label>
+                                            <input required type="number" className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" value={form.nid} onChange={e=>setForm({...form, nid:e.target.value})} placeholder="السجل المدني" />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="block text-sm font-semibold text-gray-600 mb-1">رقم الجوال</label>
+                                            <input type="tel" className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" value={form.phone} onChange={e=>setForm({...form, phone:e.target.value})} placeholder="05xxxxxxxx" />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded-lg border border-blue-100 mt-4">
+                                        <div className="text-center">
+                                            <span className="block text-sm font-bold text-blue-700 mb-2">الصورة الشخصية</span>
+                                            <input type="file" id="photoInput" accept="image/*" className="text-sm w-full" />
+                                        </div>
+                                        <div className="text-center">
+                                            <span className="block text-sm font-bold text-blue-700 mb-2">صورة الهوية</span>
+                                            <input type="file" id="docInput" accept="image/*" className="text-sm w-full" />
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-lg transition shadow-md mt-4 text-lg">
+                                        حفظ البيانات
+                                    </button>
+                                </form>
+                            </div>
+                        )}
+
+                        {/* القائمة */}
+                        {(view === 'list' || view === 'admin') && (
+                            <div className="space-y-4">
+                                <div className="bg-white p-4 rounded-lg shadow flex justify-between items-center">
+                                    <h2 className="font-bold text-lg text-gray-700">{view === 'admin' ? 'لوحة التحكم' : 'سجلات الطلاب'}</h2>
+                                    <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-bold">المجموع: {students.length}</span>
+                                </div>
+
+                                {students.length === 0 ? (
+                                    <div className="text-center py-10 bg-white rounded-lg shadow text-gray-500">
+                                        لا توجد بيانات حالياً أو جاري التحميل...
+                                    </div>
+                                ) : (
+                                    students.map(student => (
+                                        <div key={student.id} className="bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition flex flex-col sm:flex-row gap-4 items-start">
+                                            <div className="w-24 h-24 bg-gray-200 rounded-full overflow-hidden flex-shrink-0 border-4 border-white shadow-sm mx-auto sm:mx-0">
+                                                {student.photo ? 
+                                                    <img src={student.photo} className="w-full h-full object-cover" /> : 
+                                                    <div className="w-full h-full flex items-center justify-center text-gray-400 text-3xl">👤</div>
+                                                }
+                                            </div>
+                                            
+                                            <div className="flex-1 text-center sm:text-right">
+                                                <h3 className="font-bold text-xl text-gray-800">{student.name}</h3>
+                                                <div className="mt-2 space-y-1 text-sm text-gray-600">
+                                                    <p><span className="font-semibold text-gray-500 ml-1">الهوية:</span> {student.nid}</p>
+                                                    <p><span className="font-semibold text-gray-500 ml-1">الجوال:</span> {student.phone}</p>
+                                                </div>
+                                                
+                                                {student.document && (
+                                                    <button onClick={() => {
+                                                        const w = window.open("");
+                                                        w.document.write(`<img src="${student.document}" style="max-width:100%; margin: 20px auto; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"/>`);
+                                                        w.document.title = "عرض المرفق";
+                                                    }} className="inline-block mt-3 text-blue-600 bg-blue-50 px-3 py-1 rounded hover:bg-blue-100 text-sm font-bold transition">
+                                                        👁️ عرض المرفق
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {view === 'admin' && (
+                                                <button onClick={() => handleDelete(student.id)} className="bg-red-50 text-red-600 px-4 py-2 rounded-lg hover:bg-red-100 font-bold self-center w-full sm:w-auto mt-2 sm:mt-0">
+                                                    حذف
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // تشغيل مع التقاط الأخطاء
+        try {
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<App />);
+        } catch (e) {
+            document.getElementById('error-log').style.display = 'block';
+            document.getElementById('error-log').innerHTML = "React Render Error: " + e.message;
+        }
+    </script>
+</body>
+</html>
+
+ 
