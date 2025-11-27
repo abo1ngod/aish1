@@ -1,513 +1,424 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>بوابتي الرقمية - روابطي ومشاريعي</title>
-    
-    <!-- Tailwind CSS (للتصميم) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- React & ReactDOM (المحرك) -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    
-    <!-- Babel (لترجمة الكود) -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Lucide Icons (الأيقونات) -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>بوابتي الرقمية</title>
 
-    <!-- Google Fonts (خط تجوال) -->
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
 
-    <style>
-        body { font-family: 'Tajawal', sans-serif; background-color: #0f172a; color: #f8fafc; overflow-x: hidden; }
-        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
-        .gradient-text { background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        /* Loader */
-        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Tajawal', sans-serif; overflow-x: hidden; transition: background-color 0.5s ease; }
+    
+    /* أنيميشن الظهور */
+    .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    /* اللودر */
+    .loader { border: 3px solid rgba(100,100,100,0.2); border-top: 3px solid currentColor; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* تحسينات للتمرير */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #555; }
+  </style>
 </head>
 <body>
-    <div id="root"></div>
+  <div id="root"></div>
 
-    <script type="text/babel" data-type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, updateDoc, deleteDoc, doc,
+      onSnapshot, query, orderBy, setDoc
+    } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+    import htm from "https://unpkg.com/htm@3.1.1?module";
 
-        // --- إعدادات فايربيس الخاصة بك ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyBxPO6RKsQ1Cq-mqlCpFTrCuIyxnYdB37U",
-            authDomain: "studentsystem-c1ab1.firebaseapp.com",
-            databaseURL: "https://studentsystem-c1ab1-default-rtdb.firebaseio.com",
-            projectId: "studentsystem-c1ab1",
-            storageBucket: "studentsystem-c1ab1.firebasestorage.app",
-            messagingSenderId: "112215023848",
-            appId: "1:112215023848:web:0adba326a527ee7e37e95d"
-        };
+    const html = htm.bind(React.createElement);
+    const { useState, useEffect, useRef } = React;
 
-        // تهيئة التطبيق
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        
-        // أسماء المجموعات في قاعدة البيانات
-        const COLLECTION_NAME = "my_links_tree"; 
-        const SETTINGS_COLLECTION = "app_settings"; 
-        const AUTH_DOC_ID = "auth_config";
+    // --- إعدادات Firebase ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyBxPO6RKsQ1Cq-mqlCpFTrCuIyxnYdB37U",
+      authDomain: "studentsystem-c1ab1.firebaseapp.com",
+      databaseURL: "https://studentsystem-c1ab1-default-rtdb.firebaseio.com",
+      projectId: "studentsystem-c1ab1",
+      storageBucket: "studentsystem-c1ab1.firebasestorage.app",
+      messagingSenderId: "112215023848",
+      appId: "1:112215023848:web:0adba326a527ee7e37e95d"
+    };
 
-        const { useState, useEffect } = React;
-        const { Search, Link: LinkIcon, ExternalLink, Copy, Share2, Settings, Plus, Trash2, Edit2, Check, X, Save, LogOut, Loader2, Smartphone, Mail, Globe, UserCog, Key } = lucide;
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
 
-        const App = () => {
-            const [links, setLinks] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [searchTerm, setSearchTerm] = useState("");
+    const COLLECTION_NAME = "my_links_tree";
+    const SETTINGS_COLLECTION = "app_settings";
+    const AUTH_DOC_ID = "auth_config";
+
+    // --- تعريف الاستايلات (Themes) ---
+    const themes = {
+      glass: {
+        id: 'glass',
+        name: 'ليلي زجاجي',
+        icon: 'moon',
+        bgBody: 'bg-[#0f172a] text-slate-100',
+        bgEffect: true, // يظهر الخلفية المتحركة
+        card: 'bg-slate-800/60 backdrop-blur-md border border-white/10 hover:bg-slate-800/80',
+        textTitle: 'text-white',
+        textDesc: 'text-slate-400',
+        textAccent: 'text-blue-400',
+        layout: 'grid', // grid or list
+        input: 'bg-slate-900/50 border-slate-700 text-white placeholder-slate-500'
+      },
+      light: {
+        id: 'light',
+        name: 'رسمي فاتح',
+        icon: 'sun',
+        bgBody: 'bg-gray-50 text-gray-900',
+        bgEffect: false,
+        card: 'bg-white border border-gray-200 shadow-sm hover:shadow-md',
+        textTitle: 'text-gray-900',
+        textDesc: 'text-gray-600',
+        textAccent: 'text-blue-600',
+        layout: 'grid',
+        input: 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+      },
+      list: {
+        id: 'list',
+        name: 'قائمة',
+        icon: 'list',
+        bgBody: 'bg-[#1e1e2e] text-slate-200',
+        bgEffect: false,
+        card: 'bg-[#2a2a3c] border-l-4 border-l-emerald-500 rounded-r-xl hover:bg-[#32324a]',
+        textTitle: 'text-emerald-400',
+        textDesc: 'text-slate-400',
+        textAccent: 'text-emerald-500',
+        layout: 'list', // هذا المهم هنا
+        input: 'bg-[#2a2a3c] border-slate-700 text-white placeholder-slate-500'
+      },
+      cyber: {
+        id: 'cyber',
+        name: 'نيون',
+        icon: 'zap',
+        bgBody: 'bg-black text-green-500 font-mono',
+        bgEffect: false,
+        card: 'bg-black border border-green-500/50 hover:bg-green-900/10 hover:shadow-[0_0_15px_rgba(34,197,94,0.3)]',
+        textTitle: 'text-green-400',
+        textDesc: 'text-green-700',
+        textAccent: 'text-pink-500',
+        layout: 'grid',
+        input: 'bg-black border-green-800 text-green-500 placeholder-green-900'
+      }
+    };
+
+    function App() {
+      // الحالة (State)
+      const [currentThemeId, setCurrentThemeId] = useState(localStorage.getItem('app_theme') || 'glass');
+      const [showThemeMenu, setShowThemeMenu] = useState(false);
+      
+      const theme = themes[currentThemeId]; // الاستايل الحالي
+
+      const [links, setLinks] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [searchTerm, setSearchTerm] = useState("");
+      
+      const [isAdmin, setIsAdmin] = useState(false);
+      const [showLoginModal, setShowLoginModal] = useState(false);
+      const [showEditorModal, setShowEditorModal] = useState(false);
+      const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+      const [adminCreds, setAdminCreds] = useState({ username: "admin", password: "123456" });
+      const [newCreds, setNewCreds] = useState({ username: "", password: "" });
+
+      const [currentLink, setCurrentLink] = useState(null);
+      const [formData, setFormData] = useState({ title: "", desc: "", url: "", category: "عام" });
+
+      const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+      const toastTimerRef = useRef(null);
+
+      // --- التأثيرات ---
+      useEffect(() => {
+        // تطبيق الخلفية على الـ body
+        document.body.className = theme.bgBody;
+      }, [currentThemeId]);
+
+      useEffect(() => {
+        signInAnonymously(auth).catch(console.warn);
+
+        const q = query(collection(db, COLLECTION_NAME), orderBy("created_at", "desc"));
+        const unsubscribeLinks = onSnapshot(q, snapshot => {
+          setLinks(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+          setLoading(false);
+          setTimeout(() => { if (window.lucide) lucide.createIcons(); }, 100);
+        });
+
+        const unsubscribeSettings = onSnapshot(doc(db, SETTINGS_COLLECTION, AUTH_DOC_ID), s => {
+          if (s.exists()) setAdminCreds(s.data());
+        });
+
+        return () => { unsubscribeLinks(); unsubscribeSettings(); };
+      }, []);
+
+      useEffect(() => {
+        if (window.lucide) lucide.createIcons();
+      }, [links, isAdmin, showLoginModal, showEditorModal, showSettingsModal, currentThemeId]);
+
+      // --- دوال مساعدة ---
+      const changeTheme = (id) => {
+        setCurrentThemeId(id);
+        localStorage.setItem('app_theme', id);
+        setShowThemeMenu(false);
+      };
+
+      const showToast = (msg, type = "success") => {
+        setToast({ show: true, message: msg, type });
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+      };
+
+      const getFullUrl = (url) => {
+        try { return new URL(url, window.location.href).href; } catch { return url; }
+      };
+
+      const handleShare = async (link) => {
+        const fullUrl = getFullUrl(link.url);
+        if (navigator.share) {
+          try { await navigator.share({ title: link.title, text: link.desc, url: fullUrl }); } catch {}
+        } else {
+          navigator.clipboard.writeText(fullUrl).then(() => showToast("تم نسخ الرابط!"));
+        }
+      };
+
+      const copyToClipboard = (url) => {
+        navigator.clipboard.writeText(getFullUrl(url)).then(() => showToast("تم نسخ الرابط!"));
+      };
+
+      // --- عمليات البيانات ---
+      const saveLink = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+          if (currentLink) {
+            await updateDoc(doc(db, COLLECTION_NAME, currentLink.id), { ...formData, updated_at: Date.now() });
+            showToast("تم التحديث");
+          } else {
+            await addDoc(collection(db, COLLECTION_NAME), { ...formData, created_at: Date.now() });
+            showToast("تمت الإضافة");
+          }
+          setShowEditorModal(false);
+        } catch { showToast("خطأ في الحفظ", "error"); }
+        setLoading(false);
+      };
+
+      const handleDelete = async (id) => {
+        if (confirm("حذف نهائي؟")) {
+          try { await deleteDoc(doc(db, COLLECTION_NAME, id)); showToast("تم الحذف"); }
+          catch { showToast("خطأ", "error"); }
+        }
+      };
+
+      const openEditor = (link = null) => {
+        setCurrentLink(link);
+        setFormData(link ? { title: link.title, desc: link.desc, url: link.url, category: link.category } : { title: "", desc: "", url: "", category: "عام" });
+        setShowEditorModal(true);
+      };
+
+      const handleLogin = (e) => {
+        e.preventDefault();
+        if (e.target.username.value === adminCreds.username && e.target.password.value === adminCreds.password) {
+          setIsAdmin(true); setShowLoginModal(false); showToast("أهلاً بالمدير");
+        } else showToast("خطأ في الدخول", "error");
+      };
+
+      const handleUpdateCreds = async (e) => {
+        e.preventDefault();
+        try { await setDoc(doc(db, SETTINGS_COLLECTION, AUTH_DOC_ID), newCreds); showToast("تم التحديث"); setShowSettingsModal(false); }
+        catch { showToast("خطأ", "error"); }
+      };
+
+      const filteredLinks = links.filter(l => (l.title + l.desc).toLowerCase().includes(searchTerm.toLowerCase()));
+
+      // --- الواجهة ---
+      return html`
+        <div className="min-h-screen pb-12 relative transition-colors duration-500">
+          
+          ${theme.bgEffect && html`
+            <div className="absolute top-0 left-0 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none"></div>
+            <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 z-0 pointer-events-none"></div>
+          `}
+
+          <div className="absolute top-6 left-6 z-50">
+            <div className="relative">
+              <button onClick=${() => setShowThemeMenu(!showThemeMenu)} className="p-3 rounded-full shadow-lg bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 transition-all text-current" title="تغيير المظهر">
+                <i data-lucide="palette" className="w-5 h-5"></i>
+              </button>
+              ${showThemeMenu && html`
+                <div className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-200 dark:border-slate-700 overflow-hidden animate-fade-in">
+                  ${Object.values(themes).map(t => html`
+                    <button key=${t.id} onClick=${() => changeTheme(t.id)} className="w-full text-right px-4 py-3 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors ${currentThemeId === t.id ? 'text-blue-500 font-bold' : 'text-gray-600 dark:text-gray-300'}">
+                      <i data-lucide=${t.icon} className="w-4 h-4"></i> ${t.name}
+                    </button>
+                  `)}
+                </div>
+              `}
+            </div>
+          </div>
+
+          <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6">
             
-            // Auth & Admin State
-            const [isAdmin, setIsAdmin] = useState(false);
-            const [showLoginModal, setShowLoginModal] = useState(false);
-            const [showEditorModal, setShowEditorModal] = useState(false);
-            const [showSettingsModal, setShowSettingsModal] = useState(false);
-            
-            // Admin Credentials State
-            const [adminCreds, setAdminCreds] = useState({ username: "admin", password: "123456" });
-            const [newCreds, setNewCreds] = useState({ username: "", password: "" });
-            
-            // Editor Data
-            const [currentLink, setCurrentLink] = useState(null);
-            const [formData, setFormData] = useState({ title: "", desc: "", url: "", category: "عام" });
+            <header className="py-12 text-center animate-fade-in">
+              <div className="w-24 h-24 mx-auto mb-6 flex items-center justify-center rounded-full shadow-xl ring-4 ring-current/10 ${currentThemeId === 'light' ? 'bg-blue-600 text-white' : 'bg-gradient-to-tr from-blue-500 to-purple-600 text-white'}">
+                <i data-lucide="globe" className="w-10 h-10"></i>
+              </div>
+              <h1 className="text-4xl md:text-5xl font-extrabold mb-4 tracking-tight ${theme.textTitle}">
+                بوابتي <span className=${theme.textAccent}>الرقمية</span>
+              </h1>
+              <p className="text-lg max-w-2xl mx-auto leading-relaxed ${theme.textDesc}">
+                مساحتي الخاصة لمشاركة الروابط والمشاريع.
+              </p>
 
-            // Toast
-            const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+              <div className="mt-8 relative max-w-md mx-auto">
+                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none opacity-50">
+                  <i data-lucide="search" className="w-5 h-5"></i>
+                </div>
+                <input
+                  type="text"
+                  placeholder="ابحث هنا..."
+                  className="w-full pr-12 pl-4 py-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-opacity-50 transition-all shadow-sm ${theme.input} focus:ring-blue-500"
+                  value=${searchTerm}
+                  onInput=${(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </header>
 
-            // 1. الاتصال بقاعدة البيانات عند التحميل
-            useEffect(() => {
-                signInAnonymously(auth).catch(err => console.error("Auth Error:", err));
+            ${isAdmin && html`
+              <div className="mb-8 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 animate-fade-in border-l-4 border-l-blue-500 ${theme.card}">
+                <div className="flex items-center gap-2 ${theme.textAccent}"><i data-lucide="settings" className="w-5 h-5"></i><span className="font-bold">لوحة التحكم</span></div>
+                <div className="flex gap-2 flex-wrap justify-center">
+                  <button onClick=${() => openEditor()} className="btn-action bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm flex gap-2 items-center"><i data-lucide="plus" className="w-4 h-4"></i> إضافة</button>
+                  <button onClick=${() => { setNewCreds(adminCreds); setShowSettingsModal(true); }} className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl text-sm flex gap-2 items-center"><i data-lucide="user-cog" className="w-4 h-4"></i> بياناتي</button>
+                  <button onClick=${() => setIsAdmin(false)} className="bg-red-900/80 hover:bg-red-900 text-red-100 px-4 py-2 rounded-xl text-sm flex gap-2 items-center"><i data-lucide="log-out" className="w-4 h-4"></i> خروج</button>
+                </div>
+              </div>
+            `}
 
-                const q = query(collection(db, COLLECTION_NAME), orderBy("created_at", "desc"));
-                const unsubscribeLinks = onSnapshot(q, (snapshot) => {
-                    const linksData = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-                    setLinks(linksData);
-                    setLoading(false);
-                    setTimeout(() => lucide.createIcons(), 100);
-                }, (error) => {
-                    console.error("Error fetching links:", error);
-                    setLoading(false);
-                });
-
-                const unsubscribeSettings = onSnapshot(doc(db, SETTINGS_COLLECTION, AUTH_DOC_ID), (docSnap) => {
-                    if (docSnap.exists()) {
-                        setAdminCreds(docSnap.data());
-                    }
-                });
-
-                return () => {
-                    unsubscribeLinks();
-                    unsubscribeSettings();
-                };
-            }, []);
-
-            useEffect(() => {
-                lucide.createIcons();
-            }, [links, isAdmin, showLoginModal, showEditorModal, showSettingsModal]);
-
-            // --- دوال المساعدة ---
-            const showToast = (msg, type = "success") => {
-                setToast({ show: true, message: msg, type });
-                setTimeout(() => setToast({ ...toast, show: false }), 3000);
-            };
-
-            const handleLogin = (e) => {
-                e.preventDefault();
-                if (e.target.username.value === adminCreds.username && e.target.password.value === adminCreds.password) {
-                    setIsAdmin(true);
-                    setShowLoginModal(false);
-                    showToast("أهلاً بك أيها المدير");
-                } else {
-                    showToast("بيانات الدخول غير صحيحة", "error");
-                }
-            };
-
-            const handleUpdateCreds = async (e) => {
-                e.preventDefault();
-                if (!newCreds.username || !newCreds.password) {
-                    showToast("الرجاء ملء جميع الحقول", "error");
-                    return;
-                }
-                
-                try {
-                    await setDoc(doc(db, SETTINGS_COLLECTION, AUTH_DOC_ID), {
-                        username: newCreds.username,
-                        password: newCreds.password
-                    });
-                    showToast("تم تحديث بيانات الدخول بنجاح!");
-                    setShowSettingsModal(false);
-                    setNewCreds({ username: "", password: "" });
-                } catch (error) {
-                    console.error("Error updating creds:", error);
-                    showToast("حدث خطأ أثناء التحديث", "error");
-                }
-            };
-
-            // دالة للحصول على الرابط الكامل
-            const getFullUrl = (url) => {
-                try {
-                    return new URL(url, window.location.href).href;
-                } catch (e) {
-                    return url;
-                }
-            };
-
-            const handleShare = async (link) => {
-                const fullUrl = getFullUrl(link.url);
-                const shareData = {
-                    title: link.title,
-                    text: link.desc,
-                    url: fullUrl
-                };
-
-                // محاولة استخدام ميزة المشاركة الأصلية في الجوال
-                if (navigator.share) {
-                    try {
-                        await navigator.share(shareData);
-                        showToast("تم فتح قائمة المشاركة");
-                    } catch (err) {
-                        console.log("تم إلغاء المشاركة");
-                    }
-                } else {
-                    // إذا كان كمبيوتر: نسخ الرابط وفتح الواتساب ويب كمثال
-                    navigator.clipboard.writeText(fullUrl);
-                    showToast("تم نسخ الرابط الكامل للمشاركة!");
-                }
-            };
-
-            const copyToClipboard = (url) => {
-                const fullUrl = getFullUrl(url);
-                navigator.clipboard.writeText(fullUrl).then(() => showToast("تم نسخ الرابط الكامل بنجاح!"));
-            };
-
-            // --- عمليات قاعدة البيانات (CRUD) ---
-            const saveLink = async (e) => {
-                e.preventDefault();
-                setLoading(true);
-                try {
-                    const dataToSave = {
-                        ...formData,
-                        created_at: Date.now()
-                    };
-
-                    if (currentLink) {
-                        const docRef = doc(db, COLLECTION_NAME, currentLink.id);
-                        await updateDoc(docRef, dataToSave);
-                        showToast("تم التحديث بنجاح");
-                    } else {
-                        await addDoc(collection(db, COLLECTION_NAME), dataToSave);
-                        showToast("تمت الإضافة بنجاح");
-                    }
-                    setShowEditorModal(false);
-                } catch (error) {
-                    console.error("Error saving:", error);
-                    showToast("حدث خطأ أثناء الحفظ", "error");
-                }
-                setLoading(false);
-            };
-
-            const handleDelete = async (id) => {
-                if(confirm("هل أنت متأكد من الحذف النهائي؟")) {
-                    try {
-                        await deleteDoc(doc(db, COLLECTION_NAME, id));
-                        showToast("تم الحذف");
-                    } catch (error) {
-                        showToast("خطأ في الحذف", "error");
-                    }
-                }
-            };
-
-            const openEditor = (link = null) => {
-                setCurrentLink(link);
-                setFormData(link ? { title: link.title, desc: link.desc, url: link.url, category: link.category } : { title: "", desc: "", url: "", category: "عام" });
-                setShowEditorModal(true);
-            };
-
-            const filteredLinks = links.filter(link => 
-                link.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                link.desc.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-
-            return (
-                <div className="min-h-screen pb-12 relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none"></div>
-                    <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl translate-x-1/2 translate-y-1/2 z-0 pointer-events-none"></div>
-
-                    <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6">
-                        <header className="py-12 text-center animate-fade-in">
-                            <div className="w-24 h-24 mx-auto bg-gradient-to-tr from-blue-500 to-purple-600 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-blue-500/20 ring-4 ring-slate-800">
-                                <i data-lucide="globe" className="text-white w-10 h-10"></i>
-                            </div>
-                            <h1 className="text-4xl md:text-5xl font-extrabold mb-4 tracking-tight">
-                                مرحباً بك في <span className="gradient-text">بوابتي الرقمية</span>
-                            </h1>
-                            <p className="text-slate-400 text-lg max-w-2xl mx-auto leading-relaxed">
-                                بوابتك الشاملة لجميع مشاريعي، خدماتي، وروابطي الهامة. يتم تحديث القائمة تلقائياً.
-                            </p>
-                            
-                            <div className="mt-8 relative max-w-md mx-auto group">
-                                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                                    <i data-lucide="search" className="text-slate-400 w-5 h-5 group-focus-within:text-blue-500 transition-colors"></i>
-                                </div>
-                                <input 
-                                    type="text" 
-                                    placeholder="ابحث..." 
-                                    className="w-full pr-12 pl-4 py-4 rounded-2xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-lg backdrop-blur-sm"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
-                        </header>
-
-                        {isAdmin && (
-                            <div className="mb-8 p-4 glass-card rounded-2xl flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-blue-500 animate-fade-in">
-                                <div className="flex items-center gap-2 text-blue-400">
-                                    <i data-lucide="settings" className="w-5 h-5"></i>
-                                    <span className="font-bold">لوحة التحكم (متصل)</span>
-                                </div>
-                                <div className="flex gap-2 flex-wrap justify-center">
-                                    <button onClick={() => openEditor()} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition-colors text-sm font-medium shadow-lg shadow-blue-600/20">
-                                        <i data-lucide="plus" className="w-4 h-4"></i> إضافة رابط
-                                    </button>
-                                    <button onClick={() => { setNewCreds(adminCreds); setShowSettingsModal(true); }} className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl transition-colors text-sm font-medium border border-slate-600">
-                                        <i data-lucide="user-cog" className="w-4 h-4"></i> بيانات الدخول
-                                    </button>
-                                    <button onClick={() => setIsAdmin(false)} className="flex items-center gap-2 bg-red-900/50 hover:bg-red-900 text-red-200 px-4 py-2 rounded-xl transition-colors text-sm font-medium">
-                                        <i data-lucide="log-out" className="w-4 h-4"></i> خروج
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {loading ? (
-                            <div className="flex justify-center py-20">
-                                <div className="loader"></div>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {filteredLinks.length > 0 ? (
-                                    filteredLinks.map(link => (
-                                        <div key={link.id} className="glass-card p-5 rounded-2xl hover:bg-slate-800/80 transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/10 border border-slate-700/50 animate-fade-in">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <div className="p-3 bg-slate-800/80 rounded-xl text-blue-400 group-hover:text-white group-hover:bg-blue-600 transition-colors duration-300">
-                                                    <i data-lucide="link" className="w-6 h-6"></i>
-                                                </div>
-                                                <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg backdrop-blur-md">
-                                                    <button onClick={() => copyToClipboard(link.url)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors relative" title="نسخ الرابط بالكامل">
-                                                        <i data-lucide="copy" className="w-4 h-4"></i>
-                                                    </button>
-                                                    <button onClick={() => handleShare(link)} className="p-2 text-green-400 hover:text-white hover:bg-green-600 rounded-lg transition-colors" title="مشاركة (واتساب/إيميل)">
-                                                        <i data-lucide="share-2" className="w-4 h-4"></i>
-                                                    </button>
-                                                    <a href={link.url} target="_blank" className="p-2 text-blue-400 hover:text-white hover:bg-blue-600 rounded-lg transition-colors" title="فتح">
-                                                        <i data-lucide="external-link" className="w-4 h-4"></i>
-                                                    </a>
-                                                </div>
-                                            </div>
-                                            
-                                            {/* تم التعديل هنا: إضافة تاج الرابط حول العنوان ليفتح في نافذة جديدة */}
-                                            <a href={link.url} target="_blank" rel="noopener noreferrer" className="block">
-                                                <h3 className="text-xl font-bold text-white mb-1 group-hover:text-blue-400 transition-colors cursor-pointer">{link.title}</h3>
-                                            </a>
-                                            <p className="text-slate-400 text-sm mb-4 line-clamp-2 leading-relaxed">{link.desc}</p>
-                                            
-                                            <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-700/50">
-                                                <span className="text-xs font-medium px-2 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700/50">
-                                                    {link.category}
-                                                </span>
-                                                
-                                                {isAdmin && (
-                                                    <div className="flex gap-2">
-                                                        <button onClick={() => openEditor(link)} className="text-yellow-500 hover:text-yellow-400 transition-colors p-1">
-                                                            <i data-lucide="edit-2" className="w-4 h-4"></i>
-                                                        </button>
-                                                        <button onClick={() => handleDelete(link.id)} className="text-red-500 hover:text-red-400 transition-colors p-1">
-                                                            <i data-lucide="trash-2" className="w-4 h-4"></i>
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="col-span-full text-center py-12 opacity-50">
-                                        <i data-lucide="search" className="w-12 h-12 mx-auto mb-2"></i>
-                                        <p>لا توجد روابط مطابقة</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        <footer className="mt-16 text-center text-slate-500 pb-8 text-sm">
-                            <p className="mb-4">&copy; {new Date().getFullYear()} جميع الحقوق محفوظة.</p>
-                            {!isAdmin && (
-                                <button onClick={() => setShowLoginModal(true)} className="px-4 py-2 rounded-full border border-slate-800 hover:border-slate-700 hover:bg-slate-800 transition-all text-xs flex items-center gap-2 mx-auto">
-                                    <i data-lucide="settings" className="w-3 h-3"></i> دخول المطور
-                                </button>
-                            )}
-                        </footer>
+            ${loading ? html`
+              <div className="flex justify-center py-20 text-current"><div className="loader"></div></div>
+            ` : html`
+              <div className=${theme.layout === 'list' ? 'flex flex-col gap-3' : 'grid grid-cols-1 md:grid-cols-2 gap-4'}>
+                ${filteredLinks.map(link => html`
+                  <div key=${link.id} className="p-5 rounded-2xl transition-all duration-300 group hover:-translate-y-1 animate-fade-in ${theme.card}">
+                    
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="p-3 rounded-xl transition-colors ${currentThemeId === 'light' ? 'bg-blue-50 text-blue-600' : 'bg-white/5 text-blue-400 group-hover:bg-blue-600 group-hover:text-white'}">
+                        <i data-lucide="link" className="w-6 h-6"></i>
+                      </div>
+                      <div className="flex gap-1 opacity-80">
+                        <button onClick=${() => copyToClipboard(link.url)} className="p-2 hover:opacity-100 transition-opacity" title="نسخ"><i data-lucide="copy" className="w-4 h-4"></i></button>
+                        <button onClick=${() => handleShare(link)} className="p-2 hover:opacity-100 transition-opacity" title="مشاركة"><i data-lucide="share-2" className="w-4 h-4"></i></button>
+                        <a href=${getFullUrl(link.url)} target="_blank" rel="noopener noreferrer" className="p-2 hover:opacity-100 transition-opacity" title="فتح"><i data-lucide="external-link" className="w-4 h-4"></i></a>
+                      </div>
                     </div>
 
-                    {showLoginModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-                            <div className="glass-card w-full max-w-sm p-6 rounded-2xl shadow-2xl relative border-slate-700">
-                                <button onClick={() => setShowLoginModal(false)} className="absolute left-4 top-4 text-slate-400 hover:text-white">
-                                    <i data-lucide="x" className="w-5 h-5"></i>
-                                </button>
-                                <div className="text-center mb-6">
-                                    <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
-                                        <i data-lucide="key" className="text-blue-500"></i>
-                                    </div>
-                                    <h2 className="text-xl font-bold text-white">منطقة الإدارة</h2>
-                                </div>
-                                <form onSubmit={handleLogin} className="space-y-4">
-                                    <input name="username" type="text" className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" placeholder="اسم المستخدم" required />
-                                    <input name="password" type="password" className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" placeholder="كلمة المرور" required />
-                                    <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/20">
-                                        تسجيل الدخول
-                                    </button>
-                                </form>
-                            </div>
+                    <a href=${getFullUrl(link.url)} target="_blank" rel="noopener noreferrer" className="block">
+                      <h3 className="text-xl font-bold mb-1 cursor-pointer transition-colors ${theme.textTitle} hover:opacity-80">${link.title}</h3>
+                    </a>
+                    <p className="text-sm mb-4 leading-relaxed line-clamp-2 ${theme.textDesc}">${link.desc}</p>
+                    
+                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-current/10 opacity-80">
+                      <span className="text-xs font-medium px-2 py-1 rounded bg-current/5 border border-current/10">${link.category}</span>
+                      ${isAdmin && html`
+                        <div className="flex gap-2">
+                          <button onClick=${() => openEditor(link)} className="text-yellow-500 p-1 hover:scale-110 transition-transform"><i data-lucide="edit-2" className="w-4 h-4"></i></button>
+                          <button onClick=${() => handleDelete(link.id)} className="text-red-500 p-1 hover:scale-110 transition-transform"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
                         </div>
-                    )}
+                      `}
+                    </div>
+                  </div>
+                `)}
+                ${filteredLinks.length === 0 && html`
+                  <div className="col-span-full text-center py-12 opacity-50"><p>لا توجد روابط مطابقة</p></div>
+                `}
+              </div>
+            `}
 
-                    {showSettingsModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-                            <div className="glass-card w-full max-w-sm p-6 rounded-2xl shadow-2xl relative border-slate-700">
-                                <button onClick={() => setShowSettingsModal(false)} className="absolute left-4 top-4 text-slate-400 hover:text-white">
-                                    <i data-lucide="x" className="w-5 h-5"></i>
-                                </button>
-                                <div className="text-center mb-6">
-                                    <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
-                                        <i data-lucide="user-cog" className="text-emerald-500"></i>
-                                    </div>
-                                    <h2 className="text-xl font-bold text-white">تحديث بيانات الدخول</h2>
-                                    <p className="text-xs text-slate-400 mt-2">سيتم تحديث البيانات في قاعدة البيانات فوراً</p>
-                                </div>
-                                <form onSubmit={handleUpdateCreds} className="space-y-4">
-                                    <div>
-                                        <label className="text-xs text-slate-400 mb-1 block">اسم المستخدم الجديد</label>
-                                        <input 
-                                            type="text" 
-                                            value={newCreds.username}
-                                            onChange={(e) => setNewCreds({...newCreds, username: e.target.value})}
-                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
-                                            required 
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs text-slate-400 mb-1 block">كلمة المرور الجديدة</label>
-                                        <input 
-                                            type="text" 
-                                            value={newCreds.password}
-                                            onChange={(e) => setNewCreds({...newCreds, password: e.target.value})}
-                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors" 
-                                            required 
-                                        />
-                                    </div>
-                                    <button type="submit" className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-emerald-600/20">
-                                        حفظ البيانات الجديدة
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    )}
+            <footer className="mt-16 text-center opacity-60 pb-8 text-sm">
+              <p>&copy; ${new Date().getFullYear()} بوابتي الرقمية</p>
+              ${!isAdmin && html`
+                <button onClick=${() => setShowLoginModal(true)} className="mt-4 px-3 py-1 rounded-full border border-current/20 text-xs hover:bg-current/10 flex items-center gap-1 mx-auto transition-colors">
+                  <i data-lucide="settings" className="w-3 h-3"></i> دخول المطور
+                </button>
+              `}
+            </footer>
+          </div>
 
-                    {showEditorModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-                            <div className="glass-card w-full max-w-lg p-6 rounded-2xl shadow-2xl relative border-slate-700">
-                                <div className="flex justify-between items-center mb-6 border-b border-slate-700/50 pb-4">
-                                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                        {currentLink ? <><i data-lucide="edit-2" className="w-5 h-5 text-yellow-500"></i> تعديل الرابط</> : <><i data-lucide="plus" className="w-5 h-5 text-blue-500"></i> إضافة رابط جديد</>}
-                                    </h2>
-                                    <button onClick={() => setShowEditorModal(false)} className="text-slate-400 hover:text-white bg-slate-800 p-1 rounded-full">
-                                        <i data-lucide="x" className="w-5 h-5"></i>
-                                    </button>
-                                </div>
-                                <form onSubmit={saveLink} className="space-y-4">
-                                    <div>
-                                        <label className="text-xs text-slate-400 mb-1 block">عنوان الصفحة/الخدمة</label>
-                                        <input 
-                                            value={formData.title}
-                                            onChange={(e) => setFormData({...formData, title: e.target.value})}
-                                            type="text" 
-                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" 
-                                            placeholder="مثال: معرض أعمالي" required 
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs text-slate-400 mb-1 block">وصف مختصر</label>
-                                        <textarea 
-                                            value={formData.desc}
-                                            onChange={(e) => setFormData({...formData, desc: e.target.value})}
-                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 h-20 resize-none" 
-                                            placeholder="وصف يظهر للزوار..." required 
-                                        ></textarea>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-xs text-slate-400 mb-1 block">الرابط URL</label>
-                                            <input 
-                                                value={formData.url}
-                                                onChange={(e) => setFormData({...formData, url: e.target.value})}
-                                                type="text" 
-                                                dir="ltr"
-                                                className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" 
-                                                placeholder="page.html" required 
-                                            />
-                                            <p className="text-[10px] text-slate-500 mt-1">سيتم تحويله لرابط كامل عند النسخ</p>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs text-slate-400 mb-1 block">التصنيف</label>
-                                            <input 
-                                                value={formData.category}
-                                                onChange={(e) => setFormData({...formData, category: e.target.value})}
-                                                type="text" 
-                                                className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500" 
-                                                placeholder="شخصي، برمجة..." 
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="pt-4 flex gap-3">
-                                        <button type="submit" disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all flex justify-center items-center gap-2">
-                                            {loading ? <i data-lucide="loader-2" className="animate-spin"></i> : <i data-lucide="save" className="w-4 h-4"></i>}
-                                            {loading ? "جاري الحفظ..." : "حفظ البيانات"}
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
+          ${(showLoginModal || showSettingsModal || showEditorModal) && html`
+             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+               <div className="bg-slate-900 border border-slate-700 w-full max-w-lg p-6 rounded-2xl shadow-2xl relative text-white">
+                 <button onClick=${() => {setShowLoginModal(false); setShowSettingsModal(false); setShowEditorModal(false)}} className="absolute left-4 top-4 text-slate-400 hover:text-white"><i data-lucide="x" className="w-5 h-5"></i></button>
+                 
+                 ${showLoginModal && html`
+                   <h2 className="text-xl font-bold text-center mb-6">تسجيل الدخول</h2>
+                   <form onSubmit=${handleLogin} className="space-y-4">
+                     <input name="username" type="text" className="w-full bg-slate-800 border-slate-600 rounded-xl px-4 py-3 focus:border-blue-500 focus:outline-none" placeholder="المستخدم" />
+                     <input name="password" type="password" className="w-full bg-slate-800 border-slate-600 rounded-xl px-4 py-3 focus:border-blue-500 focus:outline-none" placeholder="كلمة المرور" />
+                     <button className="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-xl font-bold">دخول</button>
+                   </form>
+                 `}
 
-                    {toast.show && (
-                        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-50 animate-fade-in ${toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-600'} text-white`}>
-                            {toast.type === 'error' ? <i data-lucide="x" className="w-5 h-5"></i> : <i data-lucide="check" className="w-5 h-5"></i>}
-                            <span className="font-medium">{toast.message}</span>
-                        </div>
-                    )}
-                </div>
-            );
-        };
+                 ${showSettingsModal && html`
+                   <h2 className="text-xl font-bold text-center mb-6">تحديث البيانات</h2>
+                   <form onSubmit=${handleUpdateCreds} className="space-y-4">
+                     <input type="text" value=${newCreds.username} onInput=${e => setNewCreds({...newCreds, username: e.target.value})} className="w-full bg-slate-800 border-slate-600 rounded-xl px-4 py-3" placeholder="مستخدم جديد" />
+                     <input type="text" value=${newCreds.password} onInput=${e => setNewCreds({...newCreds, password: e.target.value})} className="w-full bg-slate-800 border-slate-600 rounded-xl px-4 py-3" placeholder="كلمة مرور جديدة" />
+                     <button className="w-full bg-emerald-600 hover:bg-emerald-700 py-3 rounded-xl font-bold">حفظ</button>
+                   </form>
+                 `}
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+                 ${showEditorModal && html`
+                    <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                      ${currentLink ? html`<i data-lucide="edit-2" className="text-yellow-500 w-5"></i> تعديل` : html`<i data-lucide="plus" className="text-blue-500 w-5"></i> جديد`}
+                    </h2>
+                    <form onSubmit=${saveLink} className="space-y-4">
+                      <input value=${formData.title} onInput=${e => setFormData({...formData, title: e.target.value})} className="w-full bg-slate-800 border-slate-600 rounded-xl px-4 py-3" placeholder="العنوان" required />
+                      <textarea value=${formData.desc} onInput=${e => setFormData({...formData, desc: e.target.value})} className="w-full bg-slate-800 border-slate-600 rounded-xl px-4 py-3 h-20 resize-none" placeholder="الوصف" required></textarea>
+                      <div className="grid grid-cols-2 gap-4">
+                        <input value=${formData.url} onInput=${e => setFormData({...formData, url: e.target.value})} className="w-full bg-slate-800 border-slate-600 rounded-xl px-4 py-3 text-left" dir="ltr" placeholder="URL" required />
+                        <input value=${formData.category} onInput=${e => setFormData({...formData, category: e.target.value})} className="w-full bg-slate-800 border-slate-600 rounded-xl px-4 py-3" placeholder="التصنيف" />
+                      </div>
+                      <button disabled=${loading} className="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-xl font-bold flex justify-center items-center gap-2">
+                        ${loading ? html`<span class="loader w-4 h-4 border-2"></span>` : html`<i data-lucide="save" className="w-4 h-4"></i> حفظ`}
+                      </button>
+                    </form>
+                 `}
+               </div>
+             </div>
+          `}
+
+          ${toast.show && html`
+            <div className=${`fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 z-[110] animate-fade-in text-white ${toast.type === 'error' ? 'bg-red-600' : 'bg-emerald-600'}`}>
+              <i data-lucide=${toast.type === 'error' ? 'alert-circle' : 'check-circle'} className="w-5 h-5"></i>
+              <span className="font-bold">${toast.message}</span>
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+    setTimeout(() => { if (window.lucide) lucide.createIcons(); }, 100);
+  </script>
 </body>
 </html>
-
-
